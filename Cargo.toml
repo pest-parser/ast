@@ -1,0 +1,7 @@
+[package]
+name = "pest-deconstruct"
+version = "0.1.0"
+authors = ["cad97 <cad97@cad97.com>"]
+
+[dependencies.pest]
+version = ">= 1, <= 2"
