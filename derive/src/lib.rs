@@ -115,11 +115,12 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
             impl #impl_generics __crate::FromPest < #lifetime > for #name #type_generics #where_clause {
                 type Rule = #rule_enum;
                 const RULE: #rule_enum = #rule_enum::#name;
-                fn from_pest(pest: Pair<#lifetime, #rule_enum>) -> Self {
+                fn from_pest(pest: __pest::iterators::Pair<#lifetime, #rule_enum>) -> Self {
                     #[allow(unused)]
-                    let span = pest.as_span();
+                    #[allow(deprecated)]
+                    let span = pest.clone().into_span();
                     #[allow(unused)]
-                    let mut it = pest.deconstruct();
+                    let mut it = __crate::PestDeconstruct::deconstruct(pest);
 
                     #implementation
                 }
@@ -194,17 +195,28 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
 
         let segment = ty.path.segments.iter().next().unwrap();
         let span = segment.span();
+        let name = &field.ident;
 
         if segment.ident == "Box" {
-            Ok(quote_spanned!(span=>Box::new(it.next())))
+            Ok(quote_spanned! {span=>
+                #(#name:)* Box::new(it.next())
+            })
         } else if segment.ident == "Vec" {
-            Ok(quote_spanned!(span=>it.next_many()))
+            Ok(quote_spanned! {span=>
+                #(#name:)* it.next_many()
+            })
         } else if segment.ident == "Option" {
-            Ok(quote_spanned!(span=>it.next_opt()))
+            Ok(quote_spanned! {span=>
+                #(#name:)* it.next_opt()
+            })
         } else if segment.ident == "Span" {
-            Ok(quote_spanned!(span=>span.into()))
+            Ok(quote_spanned! {span=>
+                #(#name:)* span.into()
+            })
         } else {
-            Ok(quote_spanned!(span=>it.next()))
+            Ok(quote_spanned! {span=>
+                #(#name:)* it.next()
+            })
         }
     }
 

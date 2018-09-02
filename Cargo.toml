@@ -4,8 +4,22 @@ version = "0.1.0"
 authors = ["cad97 <cad97@cad97.com>"]
 
 [dependencies.pest]
-version = ">= 1, <= 2"
+version = "1"
 
 [dependencies.pest-deconstruct-derive]
 version = "0.1.0"
 path = "./derive/"
+
+# This dependency is for examples only
+[dependencies.pest_derive]
+version = "1"
+optional = true
+
+[features]
+# This feature is for examples only
+examples = ["pest_derive"]
+
+[[example]]
+name = "simple"
+path = "./examples/simple.rs"
+required-features = ["pest_derive"]

@@ -1,0 +1,5 @@
+__entry__ = _{ soi ~ Expr ~ eoi }
+
+Term = { '0'..'9' }
+Expr = { Term ~ Op ~ Term }
+Op = { "+" | "-" }
