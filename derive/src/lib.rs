@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
+#![recursion_limit = "128"]
 
+extern crate itertools;
 extern crate proc_macro;
 extern crate proc_macro2;
 #[macro_use]
@@ -7,17 +9,19 @@ extern crate syn;
 extern crate single;
 #[macro_use]
 extern crate quote;
-#[macro_use]
-extern crate matches;
 
+use itertools::Itertools;
 use proc_macro2::Span;
 use single::Single;
-use syn::synom::Synom;
-use syn::{spanned::Spanned, Data, DataStruct, DeriveInput, Ident, Path};
+use syn::{
+    spanned::Spanned, synom::Synom, Data, DataStruct, DeriveInput, Field, Fields, Ident, Path,
+    Type, TypePath,
+};
 
-type DeriveResult = Result<proc_macro2::TokenStream, (String, Span)>;
+type Result<T> = std::result::Result<T, (String, Span)>;
+type DeriveResult = Result<proc_macro2::TokenStream>;
 
-#[proc_macro_derive(FromPest)]
+#[proc_macro_derive(FromPest, attributes(pest))]
 pub fn derive_FromPest(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     derive_FromPest_impl(syn::parse(input).unwrap())
         .unwrap_or_else(compile_error)
@@ -95,7 +99,7 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
     };
 
     let implementation = match input.data {
-        Data::Struct(data) => derive_FromPest_DataStruct(name.clone(), rule_enum, data)?,
+        Data::Struct(data) => derive_FromPest_DataStruct(name.clone(), data)?,
         _ => unimplemented!(),
     };
 
@@ -105,13 +109,127 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
             #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
             #[allow(rust_2018_idioms)]
             extern crate pest_deconstruct as __crate;
+            #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
+            #[allow(rust_2018_idioms)]
+            extern crate pest as __pest;
             impl #impl_generics __crate::FromPest < #lifetime > for #name #type_generics #where_clause {
-                #implementation
+                type Rule = #rule_enum;
+                const RULE: #rule_enum = #rule_enum::#name;
+                fn from_pest(pest: Pair<#lifetime, #rule_enum>) -> Self {
+                    #[allow(unused)]
+                    let span = pest.as_span();
+                    #[allow(unused)]
+                    let mut it = pest.deconstruct();
+
+                    #implementation
+                }
             }
         };
     })
 }
 
-fn derive_FromPest_DataStruct(name: Ident, rule_enum: Path, input: DataStruct) -> DeriveResult {
-    unimplemented!()
+fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
+    fn deconstruct_to_field(field: &Field) -> DeriveResult {
+        fn type_path(ty: &Type) -> Result<&TypePath> {
+            match ty {
+                Type::Slice(ty) => Err((
+                    "FromPest derive does not support slice fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Array(ty) => Err((
+                    "FromPest derive does not support array fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Ptr(ty) => Err((
+                    "FromPest derive does not support ptr fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Reference(ty) => Err((
+                    "FromPest derive does not support reference fields".to_string(),
+                    ty.span(),
+                )),
+                Type::BareFn(ty) => Err((
+                    "FromPest derive does not support bare fn fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Never(ty) => Err((
+                    "FromPest derive does not support ! fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Tuple(ty) => Err((
+                    "FromPest derive does not support tuple fields; use separate fields instead"
+                        .to_string(),
+                    ty.span(),
+                )),
+                Type::Path(ty) => Ok(ty),
+                Type::TraitObject(ty) => Err((
+                    "FromPest derive does not support trait object fields".to_string(),
+                    ty.span(),
+                )),
+                Type::ImplTrait(ty) => Err((
+                    "FromPest derive does not support impl trait fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Paren(ty) => type_path(&ty.elem),
+                Type::Group(ty) => type_path(&ty.elem),
+                Type::Infer(ty) => Err((
+                    "FromPest derive does not support inferred fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Macro(ty) => Err((
+                    "FromPest derive does not support macro typed fields".to_string(),
+                    ty.span(),
+                )),
+                Type::Verbatim(ty) => Err((
+                    "FromPest derive has no idea what type field this is".to_string(),
+                    ty.span(),
+                )),
+            }
+        }
+
+        let ty = type_path(&field.ty)?;
+        if ty.qself.is_some() {
+            Err(("FromPest derive does not support qualified self typed fields".to_string(), ty.span()))?;
+        }
+
+        let segment = ty.path.segments.iter().next().unwrap();
+        let span = segment.span();
+
+        if segment.ident == "Box" {
+            Ok(quote_spanned!(span=>Box::new(it.next())))
+        } else if segment.ident == "Vec" {
+            Ok(quote_spanned!(span=>it.next_many()))
+        } else if segment.ident == "Option" {
+            Ok(quote_spanned!(span=>it.next_opt()))
+        } else if segment.ident == "Span" {
+            Ok(quote_spanned!(span=>span.into()))
+        } else {
+            Ok(quote_spanned!(span=>it.next()))
+        }
+    }
+
+    fn accumulate<T>(mut acc: Vec<T>, item: T) -> Vec<T> {
+        acc.push(item);
+        acc
+    }
+
+    match input.fields {
+        Fields::Named(fields) => {
+            let fields = fields
+                .named
+                .iter()
+                .map(deconstruct_to_field)
+                .fold_results(vec![], accumulate)?;
+            Ok(quote!(#name { #(#fields),* } ))
+        }
+        Fields::Unnamed(fields) => {
+            let fields = fields
+                .unnamed
+                .iter()
+                .map(deconstruct_to_field)
+                .fold_results(vec![], accumulate)?;
+            Ok(quote!(#name(#(#fields),*)))
+        }
+        Fields::Unit => Ok(quote!(#name)),
+    }
 }

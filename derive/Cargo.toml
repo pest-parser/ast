@@ -11,5 +11,5 @@ proc-macro = true
 syn = "0.14"
 quote = "0.6"
 proc-macro2 = "0.4"
-matches = "0.1"
 single = "1.0.0"
+itertools = "0.7.8"
