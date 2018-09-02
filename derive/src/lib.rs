@@ -4,6 +4,7 @@
 extern crate itertools;
 extern crate proc_macro;
 extern crate proc_macro2;
+#[macro_use]
 extern crate syn;
 extern crate single;
 #[macro_use]
@@ -55,34 +56,12 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
     };
 
     let rule_enum: Path = {
-        let mut rule_lit = input
+        input
             .attrs
             .iter()
             .filter_map(Attribute::interpret_meta)
-            .filter_map(|meta| match meta {
-                Meta::List(meta) => if meta.ident == "pest" {
-                    Some(meta)
-                } else {
-                    None
-                },
-                _ => None,
-            })
-            .flat_map(|meta| meta.nested.into_iter())
-            .filter_map(|meta| match meta {
-                NestedMeta::Meta(Meta::NameValue(meta)) => if meta.ident == "rule" {
-                    Some(meta.lit)
-                } else {
-                    None
-                },
-                _ => None,
-            })
-            .map(|lit| match lit {
-                Lit::Str(lit) => Ok(lit),
-                _ => Err((
-                    "`#[pest(rule = <Rule>)]` requires a string literal path".to_string(),
-                    lit.span(),
-                )),
-            })
+            .flat_map(extract_pest_meta)
+            .filter_map(extract_assigned_rule)
             .single()
             .map_err(|err| {
                 (
@@ -96,10 +75,7 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
                     ),
                     Span::call_site(),
                 )
-            })??;
-        rule_lit
-            .parse()
-            .map_err(|_| (("Expected a path, parse failed".to_string(), rule_lit.span())))?
+            })??
     };
 
     let implementation = match input.data {
@@ -133,66 +109,137 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
     })
 }
 
-fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
-    fn deconstruct_to_field(field: &Field) -> DeriveResult {
-        fn type_path(ty: &Type) -> Result<&TypePath> {
-            match ty {
-                Type::Slice(ty) => Err((
-                    "FromPest derive does not support slice fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Array(ty) => Err((
-                    "FromPest derive does not support array fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Ptr(ty) => Err((
-                    "FromPest derive does not support ptr fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Reference(ty) => Err((
-                    "FromPest derive does not support reference fields".to_string(),
-                    ty.span(),
-                )),
-                Type::BareFn(ty) => Err((
-                    "FromPest derive does not support bare fn fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Never(ty) => Err((
-                    "FromPest derive does not support ! fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Tuple(ty) => Err((
-                    "FromPest derive does not support tuple fields; use separate fields instead"
-                        .to_string(),
-                    ty.span(),
-                )),
-                Type::Path(ty) => Ok(ty),
-                Type::TraitObject(ty) => Err((
-                    "FromPest derive does not support trait object fields".to_string(),
-                    ty.span(),
-                )),
-                Type::ImplTrait(ty) => Err((
-                    "FromPest derive does not support impl trait fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Paren(ty) => type_path(&ty.elem),
-                Type::Group(ty) => type_path(&ty.elem),
-                Type::Infer(ty) => Err((
-                    "FromPest derive does not support inferred fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Macro(ty) => Err((
-                    "FromPest derive does not support macro typed fields".to_string(),
-                    ty.span(),
-                )),
-                Type::Verbatim(ty) => Err((
-                    "FromPest derive has no idea what type field this is".to_string(),
-                    ty.span(),
-                )),
+fn extract_pest_meta(meta: Meta) -> syn::punctuated::IntoIter<NestedMeta, Token![,]> {
+    match meta {
+        Meta::List(meta) => {
+            if meta.ident == "pest" {
+                return meta.nested.into_iter();
             }
         }
+        _ => {}
+    };
+    syn::punctuated::Punctuated::new().into_iter()
+}
 
-        let ty = type_path(&field.ty)?;
+fn extract_assigned_rule(meta: NestedMeta) -> Option<Result<Path>> {
+    match meta {
+        NestedMeta::Meta(Meta::NameValue(meta)) => if meta.ident == "rule" {
+            return Some(lit_path_or_err(meta.lit));
+        },
+        _ => {}
+    }
+    None
+}
+
+fn type_path_field(ty: &Type) -> Result<&TypePath> {
+    match ty {
+        Type::Slice(ty) => Err((
+            "FromPest derive does not support slice fields".to_string(),
+            ty.span(),
+        )),
+        Type::Array(ty) => Err((
+            "FromPest derive does not support array fields".to_string(),
+            ty.span(),
+        )),
+        Type::Ptr(ty) => Err((
+            "FromPest derive does not support ptr fields".to_string(),
+            ty.span(),
+        )),
+        Type::Reference(ty) => Err((
+            "FromPest derive does not support reference fields".to_string(),
+            ty.span(),
+        )),
+        Type::BareFn(ty) => Err((
+            "FromPest derive does not support bare fn fields".to_string(),
+            ty.span(),
+        )),
+        Type::Never(ty) => Err((
+            "FromPest derive does not support ! fields".to_string(),
+            ty.span(),
+        )),
+        Type::Tuple(ty) => Err((
+            "FromPest derive does not support tuple fields; use separate fields instead"
+                .to_string(),
+            ty.span(),
+        )),
+        Type::Path(ty) => Ok(ty),
+        Type::TraitObject(ty) => Err((
+            "FromPest derive does not support trait object fields".to_string(),
+            ty.span(),
+        )),
+        Type::ImplTrait(ty) => Err((
+            "FromPest derive does not support impl trait fields".to_string(),
+            ty.span(),
+        )),
+        Type::Paren(ty) => type_path_field(&ty.elem),
+        Type::Group(ty) => type_path_field(&ty.elem),
+        Type::Infer(ty) => Err((
+            "FromPest derive does not support inferred fields".to_string(),
+            ty.span(),
+        )),
+        Type::Macro(ty) => Err((
+            "FromPest derive does not support macro typed fields".to_string(),
+            ty.span(),
+        )),
+        Type::Verbatim(ty) => Err((
+            "FromPest derive has no idea what type field this is".to_string(),
+            ty.span(),
+        )),
+    }
+}
+
+fn lit_path_or_err(lit: Lit) -> Result<Path> {
+    match lit {
+        Lit::Str(lit) => Ok(lit
+            .parse()
+            .map_err(|_| (("Expected a path, parse failed".to_string(), lit.span())))?),
+        _ => Err((
+            "`#[pest(rule = <Rule>)]` requires a string literal path".to_string(),
+            lit.span(),
+        )),
+    }
+}
+
+enum ParseKind {
+    Outer,
+    Inner(Path),
+}
+
+fn should_do_parse(field: &Field) -> Result<Option<ParseKind>> {
+    let pest_meta = field
+        .attrs
+        .iter()
+        .filter_map(Attribute::interpret_meta)
+        .flat_map(extract_pest_meta)
+        .collect_vec();
+
+    let do_parse = pest_meta.iter().any(|meta| match meta {
+        NestedMeta::Meta(Meta::Word(ident)) if ident == "parse" => true,
+        _ => false,
+    });
+
+    if do_parse {
+        let rule = pest_meta
+            .into_iter()
+            .filter_map(extract_assigned_rule)
+            .single();
+
+        match rule {
+            Ok(ident) => Ok(Some(ParseKind::Inner(ident?))),
+            Err(single::Error::NoElements) => Ok(Some(ParseKind::Outer)),
+            Err(single::Error::MultipleElements) => Err((
+                "Found multiple conflicting `#[pest(rule = <Rule>)]` on field".to_string(),
+                field.span(),
+            )),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
+    fn deconstruct_to_field(field: &Field) -> DeriveResult {
+        let ty = type_path_field(&field.ty)?;
         if ty.qself.is_some() {
             Err((
                 "FromPest derive does not support qualified self typed fields".to_string(),
@@ -204,32 +251,18 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
         let span = segment.span();
         let name = &field.ident;
 
-        let parse = field
-            .attrs
-            .iter()
-            .filter_map(Attribute::interpret_meta)
-            .filter_map(|meta| match meta {
-                Meta::List(meta) => if meta.ident == "pest" {
-                    Some(meta)
-                } else {
-                    None
-                },
-                _ => None,
-            })
-            .filter_map(|meta| meta.nested.into_iter().single().ok())
-            .filter_map(|meta| match meta {
-                NestedMeta::Meta(meta) => Some(meta),
-                _ => None,
-            })
-            .filter_map(|meta| match meta {
-                Meta::Word(ident) => Some(ident),
-                _ => None,
-            })
-            .any(|ident| ident == "parse");
-
-        let translation = if parse {
-            quote_spanned! {span=>
-                span.as_str().parse().unwrap()
+        let translation = if let Some(kind) = should_do_parse(field)? {
+            match kind {
+                ParseKind::Outer => {
+                    quote_spanned! {span=>
+                        span.clone().as_str().parse().unwrap()
+                    }
+                }
+                ParseKind::Inner(rule) => {
+                    quote_spanned! {span=>
+                        it.next_pair(#rule).into_span().as_str().parse().unwrap()
+                    }
+                }
             }
         } else if segment.ident == "Box" {
             quote_spanned! {span=>

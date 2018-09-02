@@ -75,7 +75,7 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
     ///
     /// # Panics
     ///
-    /// If the next production does not correspond to the correct rule.
+    /// If there are no remaining productions or the next one is for the wrong rule.
     pub fn next<T: FromPest<'i, Rule = R>>(&mut self) -> T {
         self.next_opt().unwrap_or_else(|| {
             panic!(
@@ -97,7 +97,7 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
             .filter(|pair| pair.as_rule() == T::RULE)
             .is_some()
         {
-            Some(T::from_pest(self.pairs.next().unwrap()))
+            Some(T::from_pest(self.next_pair(T::RULE)))
         } else {
             None
         }
@@ -115,9 +115,25 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
         children
     }
 
+    /// Get the next raw `Pair` of a certain rule type.
+    ///
+    /// # Panics
+    ///
+    /// If there are no remaining productions or the next one is for the wrong rule.
+    pub fn next_pair(&mut self, rule: R) -> Pair<'i, R> {
+        let pair = self
+            .pairs
+            .next()
+            .unwrap_or_else(|| panic!("PestDeconstructor already exhausted at `next_pair`"));
+        if pair.as_rule() != rule {
+            panic!("Expected {:?} child, got {:?}", rule, pair.as_rule());
+        }
+        pair
+    }
+
     /// Skip over the next production.
     ///
-    /// This works without providing a [`FromPest`] target type, unlike [`PestDeconstructor::next`].
+    /// This works without providing a concrete rule, unlike [`PestDeconstructor::next_pair`].
     ///
     /// # Panics
     ///

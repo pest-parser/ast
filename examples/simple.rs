@@ -29,7 +29,8 @@ mod ast {
         span: Span<'i>,
         lhs: Term<'i>,
         op: Op<'i>,
-        rhs: Term<'i>,
+        #[pest(parse, rule = "Rule::Term")]
+        rhs: u8,
     }
 
     #[derive(Debug, FromPest)]
