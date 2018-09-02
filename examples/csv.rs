@@ -9,14 +9,11 @@ mod parser {
     #[grammar = "../examples/csv.pest"]
     pub struct CSVParser;
     const _GRAMMAR: &str = include_str!("csv.pest");
-    eoi_from_pest_impl!(Rule);
 }
 
 mod ast {
-    use std::marker::PhantomData;
     use super::parser::Rule;
     use pest::Span;
-    use pest_deconstruct::EOI;
 
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule")]
@@ -38,7 +35,6 @@ mod ast {
     pub struct File<'i> {
         pub span: Span<'i>,
         pub records: Vec<Record<'i>>,
-        eoi: PhantomData<EOI<'i>>, // TODO: make this unnecessary?
     }
 }
 
@@ -49,8 +45,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use ast::File;
 
     let unparsed_file = String::from_utf8(std::fs::read("./examples/csv.csv")?)?;
-    let parsed_file = CSVParser::parse(Rule::File, &unparsed_file)?.next().unwrap();
+    let parsed_file = CSVParser::parse(Rule::File, &unparsed_file).unwrap().next().unwrap();
+    println!("ppt: {:#?}", parsed_file);
     let file = File::from_pest(parsed_file);
+    println!("ast: {:#?}", file);
+    println!();
 
     let mut field_sum: f64 = 0.0;
     let mut record_count: u64 = 0;
