@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use pest::Parser;
     use parser::{MyParser, Rule};
 
-    let parse = MyParser::parse(Rule::__entry__, "9-7")?.next().unwrap();
+    let parse = MyParser::parse(Rule::Expr, "9-7")?.next().unwrap();
     let expr = ast::Expr::from_pest(parse);
     println!("{:#?}", expr);
     Ok(())
