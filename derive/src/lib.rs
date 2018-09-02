@@ -239,7 +239,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
             }
         } else if segment.ident == "Span" {
             quote_spanned! {span=>
-                span.into()
+                span.clone().into()
             }
         } else {
             quote_spanned! {span=>
