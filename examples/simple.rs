@@ -1,5 +1,3 @@
-#![feature(unrestricted_attribute_tokens)]
-
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
@@ -18,7 +16,7 @@ mod ast {
     use pest::Span;
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = Rule)]
+    #[pest(rule = "Rule")]
     pub struct Term<'i> {
         span: Span<'i>,
         #[pest(parse)]
@@ -26,7 +24,7 @@ mod ast {
     }
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = Rule)]
+    #[pest(rule = "Rule")]
     pub struct Expr<'i> {
         span: Span<'i>,
         lhs: Term<'i>,
@@ -35,16 +33,16 @@ mod ast {
     }
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = Rule)]
+    #[pest(rule = "Rule")]
     pub struct Op<'i> {
         span: Span<'i>,
     }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use pest_deconstruct::FromPest;
-    use pest::Parser;
     use parser::{MyParser, Rule};
+    use pest::Parser;
+    use pest_deconstruct::FromPest;
 
     let parse = MyParser::parse(Rule::Expr, "9-7")?.next().unwrap();
     let expr = ast::Expr::from_pest(parse);

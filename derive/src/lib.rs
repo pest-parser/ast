@@ -14,8 +14,8 @@ use itertools::Itertools;
 use proc_macro2::Span;
 use single::Single;
 use syn::{
-    spanned::Spanned, synom::Synom, Data, DataStruct, DeriveInput, Field, Fields, Ident, Path,
-    Type, TypePath, Attribute, Meta, NestedMeta,
+    spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Field, Fields, Ident, Lit, Meta,
+    NestedMeta, Path, Type, TypePath,
 };
 
 type Result<T> = std::result::Result<T, (String, Span)>;
@@ -55,47 +55,52 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
         }
     };
 
-    let rule_enum = {
-        // syn::Meta doesn't handle `#[pest(rule = Rule)]` so do it manually
-        struct RuleMeta(Path);
-        impl Synom for RuleMeta {
-            named!(parse -> Self, do_parse!(
-                it: parens!(do_parse!(
-                    custom_keyword!(rule) >>
-                    punct!(=) >>
-                    path: syn!(Path) >>
-                    (path)
-                )) >>
-                (RuleMeta(it.1))
-            ));
-        }
-
-        let mut rule_metas = input
+    let rule_enum: Path = {
+        let mut rule_lit = input
             .attrs
             .iter()
-            .filter(|attr| {
-                attr.path
-                    .segments
-                    .iter()
-                    .single()
-                    .ok()
-                    .filter(|segment| segment.ident == "pest")
-                    .is_some()
+            .filter_map(Attribute::interpret_meta)
+            .filter_map(|meta| match meta {
+                Meta::List(meta) => if meta.ident == "pest" {
+                    Some(meta)
+                } else {
+                    None
+                },
+                _ => None,
             })
-            .filter_map(|attr| syn::parse2::<RuleMeta>(attr.tts.clone()).ok())
-            .fuse();
-
-        match (rule_metas.next(), rule_metas.next()) {
-            (Some(RuleMeta(path)), None) => path,
-            (_, Some(RuleMeta(path))) => Err((
-                "FromPest requires exactly one `#[pest(rule = Rule)]` attribute".to_string(),
-                path.span(),
-            ))?,
-            (None, None) => Err((
-                "FromPest requires exactly one `#[pest(rule = Rule)]` attribute".to_string(),
-                Span::call_site(),
-            ))?,
-        }
+            .flat_map(|meta| meta.nested.into_iter())
+            .filter_map(|meta| match meta {
+                NestedMeta::Meta(Meta::NameValue(meta)) => if meta.ident == "rule" {
+                    Some(meta.lit)
+                } else {
+                    None
+                },
+                _ => None,
+            })
+            .map(|lit| match lit {
+                Lit::Str(lit) => Ok(lit),
+                _ => Err((
+                    "`#[pest(rule = <Rule>)]` requires a string literal path".to_string(),
+                    lit.span(),
+                )),
+            })
+            .single()
+            .map_err(|err| {
+                (
+                    format!(
+                        "Deriving FromPest requires a single `#[pest(rule = <Rule>)]`, \
+                         you provided {}",
+                        match err {
+                            single::Error::NoElements => "none",
+                            single::Error::MultipleElements => "multiple",
+                        }
+                    ),
+                    Span::call_site(),
+                )
+            })??;
+        rule_lit
+            .parse()
+            .map_err(|_| (("Expected a path, parse failed".to_string(), rule_lit.span())))?
     };
 
     let implementation = match input.data {
@@ -190,27 +195,29 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
 
         let ty = type_path(&field.ty)?;
         if ty.qself.is_some() {
-            Err(("FromPest derive does not support qualified self typed fields".to_string(), ty.span()))?;
+            Err((
+                "FromPest derive does not support qualified self typed fields".to_string(),
+                ty.span(),
+            ))?;
         }
 
         let segment = ty.path.segments.iter().next().unwrap();
         let span = segment.span();
         let name = &field.ident;
 
-        let parse = field.attrs
+        let parse = field
+            .attrs
             .iter()
             .filter_map(Attribute::interpret_meta)
-            .filter_map(|meta| {
-                match meta {
-                    Meta::List(meta) => if meta.ident == "pest" {
-                        Some(meta)
-                    } else {
-                        None
-                    },
-                    _ => None,
-                }
+            .filter_map(|meta| match meta {
+                Meta::List(meta) => if meta.ident == "pest" {
+                    Some(meta)
+                } else {
+                    None
+                },
+                _ => None,
             })
-            .filter_map(|meta| meta.nested.iter().single().ok().cloned())
+            .filter_map(|meta| meta.nested.into_iter().single().ok())
             .filter_map(|meta| match meta {
                 NestedMeta::Meta(meta) => Some(meta),
                 _ => None,
