@@ -25,3 +25,8 @@ examples = ["pest_derive"]
 name = "simple"
 path = "./examples/simple.rs"
 required-features = ["pest_derive"]
+
+[[example]]
+name = "csv"
+path = "./examples/csv.rs"
+required-features = ["pest_derive"]

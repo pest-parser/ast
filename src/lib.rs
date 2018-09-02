@@ -13,7 +13,7 @@ use pest::{
     iterators::{Pair, Pairs},
     RuleType,
 };
-use std::iter::Peekable;
+use std::{fmt, iter::Peekable, marker::PhantomData};
 
 pub use derive::*;
 
@@ -27,8 +27,45 @@ pub trait FromPest<'a> {
     ///
     /// # Panics
     ///
-    /// If `pest.as_rule != <Self as FromPest>::RULE`.
+    /// If `pest.as_rule() != <Self as FromPest>::RULE`.
     fn from_pest(pest: Pair<'a, Self::Rule>) -> Self;
+}
+
+impl<'a, T: FromPest<'a> + Sized> FromPest<'a> for PhantomData<T> {
+    type Rule = T::Rule;
+    const RULE: T::Rule = T::RULE;
+    fn from_pest(pest: Pair<'a, T::Rule>) -> Self {
+        let _ = T::from_pest(pest);
+        PhantomData
+    }
+}
+
+pub struct EOI<'i> {
+    span: PhantomData<pest::Span<'i>>,
+}
+
+impl<'i> fmt::Debug for EOI<'i> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "EOI")
+    }
+}
+
+#[macro_export]
+macro_rules! eoi_from_pest_impl {
+    ($path:path) => {{
+        #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
+        #[allow(rust_2018_idioms)]
+        extern crate pest_deconstruct as __crate;
+        use __crate::*;
+        use std::marker::PhantomData;
+        impl<'i> FromPest<'i> for EOI<'i> {
+            type Rule = $path;
+            const RULE: $path = $path::eoi;
+            fn from_pest(pest: Pair<'i, $path>) -> Self {
+                EOI { span: PhantomData }
+            }
+        }
+    }};
 }
 
 /// Deconstruct a Pest `Pair` into its inner productions in a strongly-typed, panic-enforced manner.

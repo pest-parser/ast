@@ -1,0 +1,3 @@
+Field = { ('0'..'9' | "." | "-")+ }
+Record = { Field ~ ("," ~ Field)* }
+File = { soi ~ (Record ~ ("\r\n" | "\n"))* ~ eoi }
