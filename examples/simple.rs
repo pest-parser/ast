@@ -20,6 +20,8 @@ mod ast {
     #[derive(Debug, FromPest)]
     #[pest(rule = Rule)]
     pub struct Term<'i> {
+        #[pest(parse)]
+        value: u8,
         span: Span<'i>,
     }
 

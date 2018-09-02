@@ -15,7 +15,7 @@ use proc_macro2::Span;
 use single::Single;
 use syn::{
     spanned::Spanned, synom::Synom, Data, DataStruct, DeriveInput, Field, Fields, Ident, Path,
-    Type, TypePath,
+    Type, TypePath, Attribute, Meta, NestedMeta,
 };
 
 type Result<T> = std::result::Result<T, (String, Span)>;
@@ -197,7 +197,35 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
         let span = segment.span();
         let name = &field.ident;
 
-        if segment.ident == "Box" {
+        let parse = field.attrs
+            .iter()
+            .filter_map(Attribute::interpret_meta)
+            .filter_map(|meta| {
+                match meta {
+                    Meta::List(meta) => if meta.ident == "pest" {
+                        Some(meta)
+                    } else {
+                        None
+                    },
+                    _ => None,
+                }
+            })
+            .filter_map(|meta| meta.nested.iter().single().ok().cloned())
+            .filter_map(|meta| match meta {
+                NestedMeta::Meta(meta) => Some(meta),
+                _ => None,
+            })
+            .filter_map(|meta| match meta {
+                Meta::Word(ident) => Some(ident),
+                _ => None,
+            })
+            .any(|ident| ident == "parse");
+
+        if parse {
+            Ok(quote_spanned! {span=>
+                #(#name:)* span.as_str().parse().unwrap()
+            })
+        } else if segment.ident == "Box" {
             Ok(quote_spanned! {span=>
                 #(#name:)* Box::new(it.next())
             })
