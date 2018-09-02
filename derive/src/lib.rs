@@ -15,7 +15,7 @@ use proc_macro2::Span;
 use single::Single;
 use syn::{
     spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Field, Fields, Ident, Lit, Meta,
-    NestedMeta, Path, Type, TypePath,
+    NestedMeta, Path, Type, TypePath, punctuated::Pair,
 };
 
 type Result<T> = std::result::Result<T, (String, Span)>;
@@ -55,8 +55,8 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
         }
     };
 
-    let rule_enum: Path = {
-        input
+    let (rule_enum, rule_variant) = {
+        let rule_variant: Path = input
             .attrs
             .iter()
             .filter_map(Attribute::interpret_meta)
@@ -75,7 +75,23 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
                     ),
                     Span::call_site(),
                 )
-            })??
+            })??;
+        let mut rule_enum: Path = rule_variant.clone();
+        rule_enum.segments.pop();
+        if let Some(pair) = rule_enum.segments.pop() {
+            // reattach final path segment without trailing punct
+            match pair {
+                Pair::Punctuated(t, _) | Pair::End(t) => rule_enum.segments.push_value(t),
+            }
+        } else {
+            Err((
+                "`#[pest(rule = <Rule>)]` should take the path to the enum variant, \
+                 including the enum"
+                    .to_string(),
+                rule_variant.span(),
+            ))?;
+        }
+        (rule_enum, rule_variant)
     };
 
     let implementation = match input.data {
@@ -94,7 +110,7 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
             extern crate pest as __pest;
             impl #impl_generics __crate::FromPest < #lifetime > for #name #type_generics #where_clause {
                 type Rule = #rule_enum;
-                const RULE: #rule_enum = #rule_enum::#name;
+                const RULE: #rule_enum = #rule_variant;
                 fn from_pest(pest: __pest::iterators::Pair<#lifetime, #rule_enum>) -> Self {
                     #[allow(unused)]
                     #[allow(deprecated)]

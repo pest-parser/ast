@@ -16,7 +16,7 @@ mod ast {
     use pest::Span;
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = "Rule")]
+    #[pest(rule = "Rule::field")]
     pub struct Field<'i> {
         pub span: Span<'i>,
         #[pest(parse)]
@@ -24,14 +24,14 @@ mod ast {
     }
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = "Rule")]
+    #[pest(rule = "Rule::record")]
     pub struct Record<'i> {
         pub span: Span<'i>,
         pub fields: Vec<Field<'i>>,
     }
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = "Rule")]
+    #[pest(rule = "Rule::file")]
     pub struct File<'i> {
         pub span: Span<'i>,
         pub records: Vec<Record<'i>>,
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use ast::File;
 
     let unparsed_file = String::from_utf8(std::fs::read("./examples/csv.csv")?)?;
-    let parsed_file = CSVParser::parse(Rule::File, &unparsed_file).unwrap().next().unwrap();
+    let parsed_file = CSVParser::parse(Rule::file, &unparsed_file).unwrap().next().unwrap();
     println!("ppt: {:#?}", parsed_file);
     let file = File::from_pest(parsed_file);
     println!("ast: {:#?}", file);

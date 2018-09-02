@@ -16,7 +16,7 @@ mod ast {
     use pest::Span;
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = "Rule")]
+    #[pest(rule = "Rule::Term")]
     pub struct Term<'i> {
         span: Span<'i>,
         #[pest(parse)]
@@ -24,7 +24,7 @@ mod ast {
     }
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = "Rule")]
+    #[pest(rule = "Rule::Expr")]
     pub struct Expr<'i> {
         span: Span<'i>,
         lhs: Term<'i>,
@@ -34,7 +34,7 @@ mod ast {
     }
 
     #[derive(Debug, FromPest)]
-    #[pest(rule = "Rule")]
+    #[pest(rule = "Rule::Op")]
     pub struct Op<'i> {
         span: Span<'i>,
     }
