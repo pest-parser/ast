@@ -221,31 +221,33 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
             })
             .any(|ident| ident == "parse");
 
-        if parse {
-            Ok(quote_spanned! {span=>
-                #(#name:)* span.as_str().parse().unwrap()
-            })
+        let translation = if parse {
+            quote_spanned! {span=>
+                span.as_str().parse().unwrap()
+            }
         } else if segment.ident == "Box" {
-            Ok(quote_spanned! {span=>
-                #(#name:)* Box::new(it.next())
-            })
+            quote_spanned! {span=>
+                Box::new(it.next())
+            }
         } else if segment.ident == "Vec" {
-            Ok(quote_spanned! {span=>
-                #(#name:)* it.next_many()
-            })
+            quote_spanned! {span=>
+                it.next_many()
+            }
         } else if segment.ident == "Option" {
-            Ok(quote_spanned! {span=>
-                #(#name:)* it.next_opt()
-            })
+            quote_spanned! {span=>
+                it.next_opt()
+            }
         } else if segment.ident == "Span" {
-            Ok(quote_spanned! {span=>
-                #(#name:)* span.into()
-            })
+            quote_spanned! {span=>
+                span.into()
+            }
         } else {
-            Ok(quote_spanned! {span=>
-                #(#name:)* it.next()
-            })
-        }
+            quote_spanned! {span=>
+                it.next()
+            }
+        };
+
+        Ok(quote!(#(#name:)* #translation))
     }
 
     fn accumulate<T>(mut acc: Vec<T>, item: T) -> Vec<T> {
