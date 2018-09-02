@@ -5,12 +5,17 @@
 #![deny(missing_docs)]
 
 extern crate pest;
+#[allow(unused_imports)] // used via reexport
+#[macro_use]
+extern crate derive;
 
 use pest::{
     iterators::{Pair, Pairs},
     RuleType,
 };
 use std::iter::Peekable;
+
+pub use derive::*;
 
 /// Convert from the Pest parse tree to a typed AST node.
 pub trait FromPest<'a> {

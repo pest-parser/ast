@@ -5,3 +5,7 @@ authors = ["cad97 <cad97@cad97.com>"]
 
 [dependencies.pest]
 version = ">= 1, <= 2"
+
+[dependencies.pest-deconstruct-derive]
+version = "0.1.0"
+path = "./derive/"
