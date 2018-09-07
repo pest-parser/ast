@@ -14,8 +14,8 @@ use itertools::Itertools;
 use proc_macro2::Span;
 use single::Single;
 use syn::{
-    spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Field, Fields, Ident, Lit, Meta,
-    NestedMeta, Path, Type, TypePath, punctuated::Pair,
+    punctuated::Pair, spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Field, Fields,
+    Ident, Lit, Meta, NestedMeta, Path, Type, TypePath,
 };
 
 type Result<T> = std::result::Result<T, (String, Span)>;
@@ -267,38 +267,72 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
         let span = segment.span();
         let name = &field.ident;
 
-        let translation = if let Some(kind) = should_do_parse(field)? {
-            match kind {
-                ParseKind::Outer => {
-                    quote_spanned! {span=>
-                        span.clone().as_str().parse().unwrap()
-                    }
-                }
-                ParseKind::Inner(rule) => {
-                    quote_spanned! {span=>
-                        it.next_pair(#rule).into_span().as_str().parse().unwrap()
-                    }
-                }
-            }
-        } else if segment.ident == "Box" {
-            quote_spanned! {span=>
-                Box::new(it.next())
+        let translation = if segment.ident == "Box" {
+            match should_do_parse(field)? {
+                None => quote_spanned! {span=>
+                    Box::new(it.next())
+                },
+                Some(ParseKind::Outer) => quote_spanned! {span=>
+                    Box::new(span.as_str().parse().unwrap())
+                },
+                Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
+                    Box::new(it.next_pair(#rule).into_span().as_str().parse().unwrap())
+                },
             }
         } else if segment.ident == "Vec" {
-            quote_spanned! {span=>
-                it.next_many()
+            match should_do_parse(field)? {
+                None => quote_spanned! {span=>
+                    it.next_many()
+                },
+                Some(ParseKind::Outer) => Err((
+                    "It doesn't make sense to outer parse into a Vec; maybe provide a rule"
+                        .to_string(),
+                    span,
+                ))?,
+                Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
+                    it.next_pair_many(#rule)
+                        .map(|pair| pair.into_span().as_str().parse().unwrap())
+                        .collect()
+                },
             }
         } else if segment.ident == "Option" {
-            quote_spanned! {span=>
-                it.next_opt()
+            match should_do_parse(field)? {
+                None => quote_spanned! {span=>
+                    it.next_opt()
+                },
+                Some(ParseKind::Outer) => quote_spanned! {span=>
+                    span.as_str().parse().ok()
+                },
+                Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
+                    it.next_pair_opt(#rule)
+                        .and_then(|pair| pair.into_span().as_str().parse().ok())
+                },
             }
         } else if segment.ident == "Span" {
-            quote_spanned! {span=>
-                span.clone().into()
+            match should_do_parse(field)? {
+                None => quote_spanned! {span=>
+                    span.clone().into()
+                },
+                Some(ParseKind::Outer) => Err((
+                    "It doesn't make sense to outer parse into a Span; just use Span or provide a rule"
+                        .to_string(),
+                    span,
+                ))?,
+                Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
+                    it.next_pair(#rule).into_span()
+                },
             }
         } else {
-            quote_spanned! {span=>
-                it.next()
+            match should_do_parse(field)? {
+                None => quote_spanned! {span=>
+                    it.next()
+                },
+                Some(ParseKind::Outer) => quote_spanned! {span=>
+                    span.as_str().parse().unwrap()
+                },
+                Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
+                    it.next_pair(#rule).into_span().as_str().parse().unwrap()
+                },
             }
         };
 

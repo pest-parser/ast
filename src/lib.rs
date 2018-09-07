@@ -77,30 +77,14 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
     ///
     /// If there are no remaining productions or the next one is for the wrong rule.
     pub fn next<T: FromPest<'i, Rule = R>>(&mut self) -> T {
-        self.next_opt().unwrap_or_else(|| {
-            panic!(
-                "expected {:?} child, got {:?}",
-                T::RULE,
-                self.pairs.next().map(|pair| pair.as_rule())
-            )
-        })
+        T::from_pest(self.next_pair(T::RULE))
     }
 
     /// Get the next production from this parse tree node, if it is the correct rule.
     ///
     /// Useful for `Node?` productions.
     pub fn next_opt<T: FromPest<'i, Rule = R>>(&mut self) -> Option<T> {
-        // ugly to work around pre-nll rustc
-        if self
-            .pairs
-            .peek()
-            .filter(|pair| pair.as_rule() == T::RULE)
-            .is_some()
-        {
-            Some(T::from_pest(self.next_pair(T::RULE)))
-        } else {
-            None
-        }
+        self.next_pair_opt(T::RULE).map(T::from_pest)
     }
 
     /// Get the next productions from this parse tree of a single rule type.
@@ -121,27 +105,40 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
     ///
     /// If there are no remaining productions or the next one is for the wrong rule.
     pub fn next_pair(&mut self, rule: R) -> Pair<'i, R> {
-        let pair = self
-            .pairs
-            .next()
-            .unwrap_or_else(|| panic!("PestDeconstructor already exhausted at `next_pair`"));
-        if pair.as_rule() != rule {
-            panic!("Expected {:?} child, got {:?}", rule, pair.as_rule());
-        }
-        pair
+        self.next_pair_opt(rule).unwrap_or_else(|| {
+            panic!(
+                "Expected {:?} child, got {:?}",
+                rule,
+                self.pairs.peek().map(Pair::as_rule)
+            )
+        })
     }
 
-    /// Skip over the next production.
+    /// Get the next raw `Pair` if it matches a certain rule.
+    pub fn next_pair_opt(&mut self, rule: R) -> Option<Pair<'i, R>> {
+        self.pairs.next().filter(|pair| pair.as_rule() == rule)
+    }
+
+    /// Get the next raw `Pair`s while they match a certain rule.
+    pub fn next_pair_many(&mut self, rule: R) -> Vec<Pair<'i, R>> {
+        let mut children = vec![];
+        while let Some(child) = self.next_pair_opt(rule) {
+            children.push(child);
+        }
+        children
+    }
+
+    /// Get the next production.
     ///
     /// This works without providing a concrete rule, unlike [`PestDeconstructor::next_pair`].
     ///
     /// # Panics
     ///
     /// If there are no more remaining productions to skip.
-    pub fn skip(&mut self) {
+    pub fn next_untyped(&mut self) -> Pair<'i, R> {
         self.pairs
             .next()
-            .unwrap_or_else(|| panic!("PestDeconstructor already exhausted at `skip`"));
+            .unwrap_or_else(|| panic!("PestDeconstructor already exhausted at `skip`"))
     }
 
     /// Discard the remaining productions in this parse tree node.
