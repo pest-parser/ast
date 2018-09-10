@@ -14,8 +14,8 @@ use itertools::Itertools;
 use proc_macro2::Span;
 use single::Single;
 use syn::{
-    punctuated::Pair, spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Field, Fields,
-    Ident, Lit, Meta, NestedMeta, Path, Type, TypePath,
+    punctuated::Pair, spanned::Spanned, Attribute, Data, DataEnum, DataStruct, DeriveInput, Field,
+    Fields, Ident, Lit, Meta, NestedMeta, Path, Type, TypePath,
 };
 
 type Result<T> = std::result::Result<T, (String, Span)>;
@@ -96,7 +96,11 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
 
     let implementation = match input.data {
         Data::Struct(data) => derive_FromPest_DataStruct(name.clone(), data)?,
-        _ => unimplemented!(),
+        Data::Enum(data) => derive_FromPest_DataEnum(name.clone(), data)?,
+        Data::Union(data) => Err((
+            "FromPest cannot be derived for union types".to_string(),
+            data.union_token.span(),
+        ))?,
     };
 
     Ok(quote! {
@@ -253,8 +257,13 @@ fn should_do_parse(field: &Field) -> Result<Option<ParseKind>> {
     }
 }
 
+fn accumulate<T>(mut acc: Vec<T>, item: T) -> Vec<T> {
+    acc.push(item);
+    acc
+}
+
 fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
-    fn deconstruct_to_field(field: &Field) -> DeriveResult {
+    fn deconstruct_field(field: &Field) -> DeriveResult {
         let ty = type_path_field(&field.ty)?;
         if ty.qself.is_some() {
             Err((
@@ -339,17 +348,12 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
         Ok(quote!(#(#name:)* #translation))
     }
 
-    fn accumulate<T>(mut acc: Vec<T>, item: T) -> Vec<T> {
-        acc.push(item);
-        acc
-    }
-
     match input.fields {
         Fields::Named(fields) => {
             let fields = fields
                 .named
                 .iter()
-                .map(deconstruct_to_field)
+                .map(deconstruct_field)
                 .fold_results(vec![], accumulate)?;
             Ok(quote!(#name { #(#fields),* } ))
         }
@@ -357,10 +361,34 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
             let fields = fields
                 .unnamed
                 .iter()
-                .map(deconstruct_to_field)
+                .map(deconstruct_field)
                 .fold_results(vec![], accumulate)?;
             Ok(quote!(#name(#(#fields),*)))
         }
         Fields::Unit => Ok(quote!(#name)),
     }
+}
+
+fn derive_FromPest_DataEnum(name: Ident, input: DataEnum) -> DeriveResult {
+    let variants = input.variants.iter().map(|variant| {
+        let variant = &variant.ident;
+        quote! {
+            if let Some(node) = it.next_opt() {
+                #name::#variant(node)
+            }
+        }
+    });
+
+    Ok(quote! {
+        #(#variants)else* else {
+            panic!(
+                "Unexpected {}{:?}",
+                stringify!(#name),
+                ::std::iter::repeat_with(|| it.next_untyped())
+                    .take_while(Option::is_some)
+                    .map(Option::unwrap)
+                    .collect::<Vec<_>>(),
+            )
+        }
+    })
 }

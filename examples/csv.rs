@@ -39,13 +39,16 @@ mod ast {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use parser::{CSVParser, Rule};
-    use pest_deconstruct::FromPest;
-    use pest::Parser;
     use ast::File;
+    use parser::{CSVParser, Rule};
+    use pest::Parser;
+    use pest_deconstruct::FromPest;
 
     let unparsed_file = String::from_utf8(std::fs::read("./examples/csv.csv")?)?;
-    let parsed_file = CSVParser::parse(Rule::file, &unparsed_file).unwrap().next().unwrap();
+    let parsed_file = CSVParser::parse(Rule::file, &unparsed_file)
+        .unwrap()
+        .next()
+        .unwrap();
     println!("ppt: {:#?}", parsed_file);
     let file = File::from_pest(parsed_file);
     println!("ast: {:#?}", file);

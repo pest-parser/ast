@@ -30,3 +30,8 @@ required-features = ["pest_derive"]
 name = "csv"
 path = "./examples/csv.rs"
 required-features = ["pest_derive"]
+
+[[example]]
+name = "enums"
+path = "./examples/enums.rs"
+required-features = ["pest_derive"]

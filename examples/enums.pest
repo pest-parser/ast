@@ -1,0 +1,11 @@
+ident_head = _{ 'a'..'z' | 'A'..'Z' }
+ident_tail = _{ ident_head | digit }
+digit = _{ '0'..'9' }
+
+ident = @{ ident_head ~ ident_tail* }
+number = @{ digit+ }
+
+term = { ident | number }
+terms = { term+ }
+
+whitespace = _{ '\0'..' ' }

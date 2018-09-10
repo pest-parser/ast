@@ -31,6 +31,23 @@ pub trait FromPest<'a>: Sized {
     fn from_pest(pest: Pair<'a, Self::Rule>) -> Self;
 }
 
+// FUTURE(rust-lang/rust#46969):
+//    - impl<'a, T: FromPest<'a>> FromPest<'a> for PhantomData<T> {
+//          type Rule: T::Rule;
+//          const RULE = T::RULE;
+//          fn from_pest(pest: Pair<'a, T::Rule>) -> Self {
+//              let _ = T::from_pest(pest);
+//              PhantomData
+//          }
+//      }
+//    - impl<'a, T: FromPest<'a>> FromPest<'a> for Box<T> {
+//          type Rule: T::Rule;
+//          const RULE = T::RULE;
+//          fn from_pest(pest: Pair<'a, T::Rule>) -> Self {
+//              Box::new(T::from_pest(pest))
+//          }
+//      }
+
 /// Deconstruct a Pest `Pair` into its inner productions in a strongly-typed, panic-enforced manner.
 /// See [`PestDeconstructor`] for more information.
 pub trait PestDeconstruct<'i> {
@@ -61,7 +78,7 @@ pub struct PestDeconstructor<'i, R: RuleType> {
 impl<'i, R: RuleType> Drop for PestDeconstructor<'i, R> {
     fn drop(&mut self) {
         assert_eq!(
-            self.pairs.next(),
+            self.next_untyped(),
             None,
             "PestDeconstructor was not fully exhausted"
         )
@@ -116,7 +133,16 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
 
     /// Get the next raw `Pair` if it matches a certain rule.
     pub fn next_pair_opt(&mut self, rule: R) -> Option<Pair<'i, R>> {
-        self.pairs.next().filter(|pair| pair.as_rule() == rule)
+        if self
+            .pairs
+            .peek()
+            .filter(|pair| pair.as_rule() == rule)
+            .is_some()
+        {
+            self.next_untyped()
+        } else {
+            None
+        }
     }
 
     /// Get the next raw `Pair`s while they match a certain rule.
@@ -128,17 +154,11 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
         children
     }
 
-    /// Get the next production.
+    /// Get the next production, if it exists.
     ///
     /// This works without providing a concrete rule, unlike [`PestDeconstructor::next_pair`].
-    ///
-    /// # Panics
-    ///
-    /// If there are no more remaining productions to skip.
-    pub fn next_untyped(&mut self) -> Pair<'i, R> {
-        self.pairs
-            .next()
-            .unwrap_or_else(|| panic!("PestDeconstructor already exhausted at `skip`"))
+    pub fn next_untyped(&mut self) -> Option<Pair<'i, R>> {
+        self.pairs.next()
     }
 
     /// Discard the remaining productions in this parse tree node.
