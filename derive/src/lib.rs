@@ -351,7 +351,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                     span,
                 ))?,
                 Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
-                    it.next_pair(#rule).as_span()
+                    it.next_pair(#rule).as_span().into()
                 },
             }
         } else {
