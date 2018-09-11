@@ -1,0 +1,6 @@
+number      = @{ ASCII_DIGIT+ }
+one_number  =  { number  }
+many_number =  { number+ }
+
+WHITESPACE = _{ WHITE_SPACE }
+

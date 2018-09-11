@@ -37,3 +37,8 @@ required-features = ["pest_derive"]
 name = "enums"
 path = "./examples/enums.rs"
 required-features = ["pest_derive"]
+
+[[example]]
+name = "parse"
+path = "./examples/parse.rs"
+required-features = ["pest_derive"]
