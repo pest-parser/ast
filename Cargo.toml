@@ -2,19 +2,21 @@
 
 [package]
 name = "pest-deconstruct"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["cad97 <cad97@cad97.com>"]
 
 [dependencies.pest]
-version = "1"
+version = "2"
+git = "https://github.com/pest-parser/pest.git"
 
 [dependencies.pest-deconstruct-derive]
-version = "0.1.0"
+version = "0.2.0"
 path = "./derive/"
 
 # This dependency is for examples only
 [dependencies.pest_derive]
-version = "1"
+version = "2"
+git = "https://github.com/pest-parser/pest.git"
 optional = true
 
 [features]

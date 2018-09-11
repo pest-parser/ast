@@ -118,7 +118,7 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
                 fn from_pest(pest: __pest::iterators::Pair<#lifetime, #rule_enum>) -> Self {
                     #[allow(unused)]
                     #[allow(deprecated)]
-                    let span = pest.clone().into_span();
+                    let span = pest.as_span();
                     #[allow(unused)]
                     let mut it = __crate::PestDeconstruct::deconstruct(pest);
 
@@ -285,7 +285,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                     Box::new(span.as_str().parse().unwrap())
                 },
                 Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
-                    Box::new(it.next_pair(#rule).into_span().as_str().parse().unwrap())
+                    Box::new(it.next_pair(#rule).as_span().as_str().parse().unwrap())
                 },
             }
         } else if segment.ident == "Vec" {
@@ -300,7 +300,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                 ))?,
                 Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
                     it.next_pair_many(#rule)
-                        .map(|pair| pair.into_span().as_str().parse().unwrap())
+                        .map(|pair| pair.as_span().as_str().parse().unwrap())
                         .collect()
                 },
             }
@@ -314,7 +314,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                 },
                 Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
                     it.next_pair_opt(#rule)
-                        .and_then(|pair| pair.into_span().as_str().parse().ok())
+                        .and_then(|pair| pair.as_span().as_str().parse().ok())
                 },
             }
         } else if segment.ident == "Span" {
@@ -328,7 +328,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                     span,
                 ))?,
                 Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
-                    it.next_pair(#rule).into_span()
+                    it.next_pair(#rule).as_span()
                 },
             }
         } else {
@@ -340,7 +340,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                     span.as_str().parse().unwrap()
                 },
                 Some(ParseKind::Inner(rule)) => quote_spanned! {span=>
-                    it.next_pair(#rule).into_span().as_str().parse().unwrap()
+                    it.next_pair(#rule).as_span().as_str().parse().unwrap()
                 },
             }
         };

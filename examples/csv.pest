@@ -1,3 +1,3 @@
-field = { ('0'..'9' | "." | "-")+ }
+field = { (ASCII_DIGIT | "." | "-")+ }
 record = { field ~ ("," ~ field)* }
-file = { soi ~ (record ~ ("\r\n" | "\n"))* ~ eoi }
+file = { SOI ~ (record ~ ("\r\n" | "\n"))* ~ EOI }
