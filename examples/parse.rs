@@ -14,7 +14,14 @@ mod parser {
 
 mod ast {
     use super::parser::Rule;
-    use pest::Span;
+
+    #[derive(Debug)]
+    struct Span<'i>(&'i str, usize, usize);
+    impl<'i> From<::pest::Span<'i>> for Span<'i> {
+        fn from(span: ::pest::Span<'i>) -> Self {
+            Span(span.as_str(), span.start(), span.end())
+        }
+    }
 
     // Box
     #[derive(Debug, FromPest)]
