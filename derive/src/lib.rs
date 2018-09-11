@@ -94,6 +94,26 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
         (rule_enum, rule_variant)
     };
 
+    let discard = input
+        .attrs
+        .iter()
+        .filter_map(Attribute::interpret_meta)
+        .flat_map(extract_pest_meta)
+        .filter_map(|attr| match attr {
+            NestedMeta::Meta(Meta::Word(ident)) => Some(ident),
+            _ => None,
+        })
+        .filter(|ident| ident == "discard_trailing")
+        .map(|_| Ok(quote!(it.discard();)))
+        .single()
+        .unwrap_or_else(|err| match err {
+            single::Error::MultipleElements => Err((
+                "Multiple pest(discard_trailing) attributes are not allowed".to_string(),
+                Span::call_site(),
+            )),
+            single::Error::NoElements => Ok(quote!()),
+        })?;
+
     let implementation = match input.data {
         Data::Struct(data) => derive_FromPest_DataStruct(name.clone(), data)?,
         Data::Enum(data) => derive_FromPest_DataEnum(name.clone(), data)?,
@@ -122,7 +142,9 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
                     #[allow(unused)]
                     let mut it = __crate::PestDeconstruct::deconstruct(pest);
 
-                    #implementation
+                    let result = #implementation;
+                    #discard
+                    result
                 }
             }
         };

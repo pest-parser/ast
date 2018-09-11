@@ -32,6 +32,7 @@ mod ast {
 
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule::file")]
+    #[pest(discard_trailing)] // discard trailing EOI
     pub struct File<'i> {
         pub span: Span<'i>,
         pub records: Vec<Record<'i>>,

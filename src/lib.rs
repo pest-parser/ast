@@ -162,7 +162,10 @@ impl<'i, R: RuleType> PestDeconstructor<'i, R> {
     }
 
     /// Discard the remaining productions in this parse tree node.
-    pub fn discard(self) {
-        let _ = self.pairs;
+    pub fn discard(mut self) {
+        // Cannot move out of Drop type, but we want to forget to run Drop::drop
+        let mut pairs = unsafe { std::mem::uninitialized() };
+        std::mem::swap(&mut self.pairs, &mut pairs);
+        std::mem::forget(self);
     }
 }
