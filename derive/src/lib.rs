@@ -43,7 +43,7 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
     let name = input.ident;
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
-    let impl_hiding_const = syn::Ident::new(
+    let impl_scoping_const = syn::Ident::new(
         &format!("__IMPL_FromPest_FOR_{}", name.to_string()),
         Span::call_site(),
     );
@@ -112,7 +112,7 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
 
     Ok(quote! {
         #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
-        const #impl_hiding_const: () = {
+        const #impl_scoping_const: () = {
             #[cfg_attr(feature = "cargo-clippy", allow(useless_attribute))]
             #[allow(rust_2018_idioms)]
             extern crate pest_deconstruct as __crate;
