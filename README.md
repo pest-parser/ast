@@ -15,7 +15,7 @@ This library is now dogfooded for the [nafi](https://github.com/nafi-lang/rust-n
 
 See the current list of [[good first issue] issues](
 https://github.com/pest-parser/pest_deconstruct/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-If you have issues, don't be afraid to @ the author (CAD97) on the [pest Gitter channel](
+If you have questions, don't be afraid to @ the author (CAD97) on the [pest Gitter channel](
 https://gitter.im/dragostis/pest).
 
 
