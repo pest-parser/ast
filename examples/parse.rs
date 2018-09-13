@@ -28,21 +28,21 @@ mod ast {
     #[pest(rule = "Rule::one_number")]
     struct BoxInner<'i> {
         span: Span<'i>,
-        inner: Box<BoxParseOuter<'i>>
+        inner: Box<BoxParseOuter<'i>>,
     }
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule::number")]
     struct BoxParseOuter<'i> {
         span: Span<'i>,
         #[pest(parse)]
-        value: Box<usize>
+        value: Box<usize>,
     }
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule::one_number")]
     struct BoxParseInner<'i> {
         span: Span<'i>,
-        #[pest(parse, rule="Rule::number")]
-        inner: Box<usize>
+        #[pest(parse, rule = "Rule::number")]
+        inner: Box<usize>,
     }
 
     // Vec
@@ -50,7 +50,7 @@ mod ast {
     #[pest(rule = "Rule::many_number")]
     struct VecInner<'i> {
         span: Span<'i>,
-        inner: Vec<Inner<'i>>
+        inner: Vec<Inner<'i>>,
     }
     // VecParseOuter doesn't make sense
     #[derive(Debug, FromPest)]
@@ -58,7 +58,7 @@ mod ast {
     struct VecParseInner<'i> {
         span: Span<'i>,
         #[pest(parse, rule = "Rule::number")]
-        inner: Vec<usize>
+        inner: Vec<usize>,
     }
 
     // Option
@@ -66,21 +66,21 @@ mod ast {
     #[pest(rule = "Rule::one_number")]
     struct OptionInner<'i> {
         span: Span<'i>,
-        inner: Option<OptionParseOuter<'i>>
+        inner: Option<OptionParseOuter<'i>>,
     }
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule::number")]
     struct OptionParseOuter<'i> {
         span: Span<'i>,
         #[pest(parse)]
-        value: Option<usize>
+        value: Option<usize>,
     }
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule::one_number")]
     struct OptionParseInner<'i> {
         span: Span<'i>,
         #[pest(parse, rule = "Rule::number")]
-        value: Option<usize>
+        value: Option<usize>,
     }
 
     // Span
@@ -109,14 +109,14 @@ mod ast {
     struct ParseOuter<'i> {
         span: Span<'i>,
         #[pest(parse)]
-        value: usize
+        value: usize,
     }
     #[derive(Debug, FromPest)]
     #[pest(rule = "Rule::one_number")]
     struct ParseInner<'i> {
         span: Span<'i>,
         #[pest(parse, rule = "Rule::number")]
-        value: usize
+        value: usize,
     }
 }
 

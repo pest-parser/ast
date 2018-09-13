@@ -4,9 +4,8 @@
 extern crate itertools;
 extern crate proc_macro;
 extern crate proc_macro2;
-#[macro_use]
-extern crate syn;
 extern crate single;
+extern crate syn;
 #[macro_use]
 extern crate quote;
 
@@ -14,9 +13,15 @@ use itertools::Itertools;
 use proc_macro2::Span;
 use single::Single;
 use syn::{
-    punctuated::Pair, spanned::Spanned, Attribute, Data, DataEnum, DataStruct, DeriveInput, Field,
-    Fields, Ident, Lit, Meta, NestedMeta, Path, Type, TypePath,
+    punctuated::Pair, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput, Field, Fields,
+    Ident, Path, Type, TypePath,
 };
+
+mod attributes;
+mod utils;
+
+use attributes::{pest_attributes, PestAttribute};
+use utils::accumulate;
 
 type Result<T> = std::result::Result<T, (String, Span)>;
 type DeriveResult = Result<proc_macro2::TokenStream>;
@@ -55,13 +60,12 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
         }
     };
 
+    let attrs = pest_attributes(&input.attrs)?;
+
     let (rule_enum, rule_variant) = {
-        let rule_variant: Path = input
-            .attrs
+        let rule_variant = attrs
             .iter()
-            .filter_map(Attribute::interpret_meta)
-            .flat_map(extract_pest_meta)
-            .filter_map(extract_assigned_rule)
+            .filter_map(PestAttribute::rule)
             .single()
             .map_err(|err| {
                 (
@@ -75,44 +79,27 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
                     ),
                     Span::call_site(),
                 )
-            })??;
+            })?;
         let mut rule_enum: Path = rule_variant.clone();
         rule_enum.segments.pop();
-        if let Some(pair) = rule_enum.segments.pop() {
-            // reattach final path segment without trailing punct
-            match pair {
-                Pair::Punctuated(t, _) | Pair::End(t) => rule_enum.segments.push_value(t),
-            }
-        } else {
-            Err((
-                "`#[pest(rule = <Rule>)]` should take the path to the enum variant, \
-                 including the enum"
-                    .to_string(),
+        match rule_enum.segments.pop() {
+            Some(Pair::Punctuated(t, _)) | Some(Pair::End(t)) => rule_enum.segments.push_value(t),
+            None => Err((
+                "Path should be to the enum variant, including the enum in the path".to_string(),
                 rule_variant.span(),
-            ))?;
+            ))?,
         }
         (rule_enum, rule_variant)
     };
 
-    let discard = input
-        .attrs
-        .iter()
-        .filter_map(Attribute::interpret_meta)
-        .flat_map(extract_pest_meta)
-        .filter_map(|attr| match attr {
-            NestedMeta::Meta(Meta::Word(ident)) => Some(ident),
-            _ => None,
-        })
-        .filter(|ident| ident == "discard_trailing")
-        .map(|_| Ok(quote!(it.discard();)))
-        .single()
-        .unwrap_or_else(|err| match err {
-            single::Error::MultipleElements => Err((
-                "Multiple pest(discard_trailing) attributes are not allowed".to_string(),
-                Span::call_site(),
-            )),
-            single::Error::NoElements => Ok(quote!()),
-        })?;
+    let discard = match attrs.iter().filter(|attr| attr.discard_trailing()).count() {
+        0 => quote!(),
+        1 => quote!(it.discard();),
+        _ => Err((
+            "Multiple `#[pest(discard_trailing)]` attributes are not allowed".to_string(),
+            Span::call_site(),
+        ))?,
+    };
 
     let implementation = match input.data {
         Data::Struct(data) => derive_FromPest_DataStruct(name.clone(), data)?,
@@ -137,7 +124,6 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
                 const RULE: #rule_enum = #rule_variant;
                 fn from_pest(pest: __pest::iterators::Pair<#lifetime, #rule_enum>) -> Self {
                     #[allow(unused)]
-                    #[allow(deprecated)]
                     let span = pest.as_span();
                     #[allow(unused)]
                     let mut it = __crate::PestDeconstruct::deconstruct(pest);
@@ -149,28 +135,6 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
             }
         };
     })
-}
-
-fn extract_pest_meta(meta: Meta) -> syn::punctuated::IntoIter<NestedMeta, Token![,]> {
-    match meta {
-        Meta::List(meta) => {
-            if meta.ident == "pest" {
-                return meta.nested.into_iter();
-            }
-        }
-        _ => {}
-    };
-    syn::punctuated::Punctuated::new().into_iter()
-}
-
-fn extract_assigned_rule(meta: NestedMeta) -> Option<Result<Path>> {
-    match meta {
-        NestedMeta::Meta(Meta::NameValue(meta)) => if meta.ident == "rule" {
-            return Some(lit_path_or_err(meta.lit));
-        },
-        _ => {}
-    }
-    None
 }
 
 fn type_path_field(ty: &Type) -> Result<&TypePath> {
@@ -230,58 +194,29 @@ fn type_path_field(ty: &Type) -> Result<&TypePath> {
     }
 }
 
-fn lit_path_or_err(lit: Lit) -> Result<Path> {
-    match lit {
-        Lit::Str(lit) => Ok(lit
-            .parse()
-            .map_err(|_| (("Expected a path, parse failed".to_string(), lit.span())))?),
-        _ => Err((
-            "`#[pest(rule = <Rule>)]` requires a string literal path".to_string(),
-            lit.span(),
-        )),
-    }
-}
-
 enum ParseKind {
     Outer,
     Inner(Path),
 }
 
 fn should_do_parse(field: &Field) -> Result<Option<ParseKind>> {
-    let pest_meta = field
-        .attrs
-        .iter()
-        .filter_map(Attribute::interpret_meta)
-        .flat_map(extract_pest_meta)
-        .collect_vec();
+    let attrs = pest_attributes(&field.attrs)?;
 
-    let do_parse = pest_meta.iter().any(|meta| match meta {
-        NestedMeta::Meta(Meta::Word(ident)) if ident == "parse" => true,
-        _ => false,
-    });
-
-    if do_parse {
-        let rule = pest_meta
-            .into_iter()
-            .filter_map(extract_assigned_rule)
-            .single();
-
-        match rule {
-            Ok(ident) => Ok(Some(ParseKind::Inner(ident?))),
-            Err(single::Error::NoElements) => Ok(Some(ParseKind::Outer)),
+    Ok(match attrs.iter().filter(|attr| attr.parse()).count() {
+        0 => None,
+        1 => match attrs.iter().flat_map(|attr| attr.rule()).single() {
+            Ok(path) => Some(ParseKind::Inner(path.clone())),
+            Err(single::Error::NoElements) => Some(ParseKind::Outer),
             Err(single::Error::MultipleElements) => Err((
-                "Found multiple conflicting `#[pest(rule = <Rule>)]` on field".to_string(),
+                "Multiple `#[pest(rule = <Rule>)]` are not allowed".to_string(),
                 field.span(),
-            )),
-        }
-    } else {
-        Ok(None)
-    }
-}
-
-fn accumulate<T>(mut acc: Vec<T>, item: T) -> Vec<T> {
-    acc.push(item);
-    acc
+            ))?,
+        },
+        _ => Err((
+            "Multiple `#[pest(parse)]` attributes are not allowed".to_string(),
+            Span::call_site(),
+        ))?,
+    })
 }
 
 fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
