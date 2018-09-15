@@ -5,7 +5,6 @@ extern crate itertools;
 extern crate proc_macro;
 extern crate proc_macro2;
 extern crate single;
-#[macro_use]
 extern crate syn;
 #[macro_use]
 extern crate quote;
@@ -53,12 +52,11 @@ fn derive_FromPest_impl(input: DeriveInput) -> DeriveResult {
         let mut lifetimes = input.generics.lifetimes();
         match (lifetimes.next(), lifetimes.next()) {
             (Some(def), None) => def.lifetime.clone(),
-            (Some(_), Some(_)) => Err((
-                "FromPest cannot be derived on a struct with more than one lifetime parameter"
+            _ => Err((
+                "FromPest can only be derived for a struct with a single lifetime parameter"
                     .to_string(),
                 input.generics.params.span(),
             ))?,
-            (None, _) => parse_quote!('i),
         }
     };
 
