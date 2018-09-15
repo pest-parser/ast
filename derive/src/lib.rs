@@ -329,31 +329,46 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
 }
 
 fn derive_FromPest_DataEnum(name: Ident, input: DataEnum) -> DeriveResult {
-    let variants = input.variants.iter().map(|variant| {
-        let attrs = pest_attributes(&variant.attrs)?;
-        let ident = &variant.ident;
+    let variants = input
+        .variants
+        .iter()
+        .map(|variant| {
+            let attrs = pest_attributes(&variant.attrs)?;
+            let ident = &variant.ident;
 
-        match should_do_parse(variant.span(), &attrs)? {
-            None => Ok(quote! {
-                if let Some(node) = it.next_opt() {
-                    #name::#ident(node)
-                }
-            }),
-            Some(ParseKind::Outer) => Ok(quote! {
-                if let Ok(node) = span.as_str().parse() {
-                    #name::#ident(node)
-                }
-            }),
-            Some(ParseKind::Inner(rule)) => Ok(quote! {
-                if let Some(Ok(node)) = it.next_pair_opt(#rule)
-                    .map(|pair| pair.as_span().as_str().parse())
-                {
-                    it.next_untyped();
-                    #name::#ident(node)
-                }
-            }),
-        }
-    }).fold_results(vec![], accumulate)?;
+            match should_do_parse(variant.span(), &attrs)? {
+                None => match attrs.iter().filter_map(PestAttribute::rule).single() {
+                    Ok(rule) => Ok(quote! {
+                        if let Some(pair) = it.next_pair_opt(#rule) {
+                            it.next_untyped();
+                            #name::#ident(pair.as_span().into())
+                        }
+                    }),
+                    Err(single::Error::NoElements) => Ok(quote! {
+                        if let Some(node) = it.next_opt() {
+                            #name::#ident(node)
+                        }
+                    }),
+                    Err(single::Error::MultipleElements) => Err((
+                        "Multiple conflicting #[pest(rule = <Rule>)]".to_string(),
+                        variant.span(),
+                    )),
+                },
+                Some(ParseKind::Outer) => Ok(quote! {
+                    if let Ok(node) = span.as_str().parse() {
+                        #name::#ident(node)
+                    }
+                }),
+                Some(ParseKind::Inner(rule)) => Ok(quote! {
+                    if let Some(Ok(node)) = it.next_pair_opt(#rule)
+                        .map(|pair| pair.as_span().as_str().parse())
+                    {
+                        it.next_untyped();
+                        #name::#ident(node)
+                    }
+                }),
+            }
+        }).fold_results(vec![], accumulate)?;
 
     Ok(quote! {
         #(#variants)else* else {

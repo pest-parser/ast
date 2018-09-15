@@ -128,6 +128,8 @@ mod ast {
         ParseOuter(usize),
         #[pest(parse, rule = "Rule::number")]
         ParseInner(usize),
+        #[pest(rule = "Rule::number")]
+        InnerSpan(Span<'i>),
     }
 }
 
