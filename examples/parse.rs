@@ -118,6 +118,17 @@ mod ast {
         #[pest(parse, rule = "Rule::number")]
         value: usize,
     }
+
+    // Enums
+    #[derive(Debug, FromPest)]
+    #[pest(rule = "Rule::one_number")]
+    enum Enum<'i> {
+        Inner(Inner<'i>),
+        #[pest(parse)]
+        ParseOuter(usize),
+        #[pest(parse, rule = "Rule::number")]
+        ParseInner(usize),
+    }
 }
 
 fn main() {

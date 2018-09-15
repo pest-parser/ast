@@ -199,9 +199,7 @@ enum ParseKind {
     Inner(Path),
 }
 
-fn should_do_parse(field: &Field) -> Result<Option<ParseKind>> {
-    let attrs = pest_attributes(&field.attrs)?;
-
+fn should_do_parse(span: Span, attrs: &[PestAttribute]) -> Result<Option<ParseKind>> {
     Ok(match attrs.iter().filter(|attr| attr.parse()).count() {
         0 => None,
         1 => match attrs.iter().flat_map(|attr| attr.rule()).single() {
@@ -209,7 +207,7 @@ fn should_do_parse(field: &Field) -> Result<Option<ParseKind>> {
             Err(single::Error::NoElements) => Some(ParseKind::Outer),
             Err(single::Error::MultipleElements) => Err((
                 "Multiple `#[pest(rule = <Rule>)]` are not allowed".to_string(),
-                field.span(),
+                span,
             ))?,
         },
         _ => Err((
@@ -232,9 +230,10 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
         let segment = ty.path.segments.iter().next().unwrap();
         let span = segment.span();
         let name = &field.ident;
+        let attrs = pest_attributes(&field.attrs)?;
 
         let translation = if segment.ident == "Box" {
-            match should_do_parse(field)? {
+            match should_do_parse(field.span(), &attrs)? {
                 None => quote_spanned! {span=>
                     Box::new(it.next())
                 },
@@ -246,7 +245,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                 },
             }
         } else if segment.ident == "Vec" {
-            match should_do_parse(field)? {
+            match should_do_parse(field.span(), &attrs)? {
                 None => quote_spanned! {span=>
                     it.next_many()
                 },
@@ -263,7 +262,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                 },
             }
         } else if segment.ident == "Option" {
-            match should_do_parse(field)? {
+            match should_do_parse(field.span(), &attrs)? {
                 None => quote_spanned! {span=>
                     it.next_opt()
                 },
@@ -276,7 +275,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                 },
             }
         } else if segment.ident == "Span" {
-            match should_do_parse(field)? {
+            match should_do_parse(field.span(), &attrs)? {
                 None => quote_spanned! {span=>
                     span.clone().into()
                 },
@@ -290,7 +289,7 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
                 },
             }
         } else {
-            match should_do_parse(field)? {
+            match should_do_parse(field.span(), &attrs)? {
                 None => quote_spanned! {span=>
                     it.next()
                 },
@@ -329,13 +328,30 @@ fn derive_FromPest_DataStruct(name: Ident, input: DataStruct) -> DeriveResult {
 
 fn derive_FromPest_DataEnum(name: Ident, input: DataEnum) -> DeriveResult {
     let variants = input.variants.iter().map(|variant| {
-        let variant = &variant.ident;
-        quote! {
-            if let Some(node) = it.next_opt() {
-                #name::#variant(node)
-            }
+        let attrs = pest_attributes(&variant.attrs)?;
+        let ident = &variant.ident;
+
+        match should_do_parse(variant.span(), &attrs)? {
+            None => Ok(quote! {
+                if let Some(node) = it.next_opt() {
+                    #name::#ident(node)
+                }
+            }),
+            Some(ParseKind::Outer) => Ok(quote! {
+                if let Ok(node) = span.as_str().parse() {
+                    #name::#ident(node)
+                }
+            }),
+            Some(ParseKind::Inner(rule)) => Ok(quote! {
+                if let Some(Ok(node)) = it.next_pair_opt(#rule)
+                    .map(|pair| pair.as_span().as_str().parse())
+                {
+                    it.next_untyped();
+                    #name::#ident(node)
+                }
+            }),
         }
-    });
+    }).fold_results(vec![], accumulate)?;
 
     Ok(quote! {
         #(#variants)else* else {
