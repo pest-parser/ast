@@ -2,6 +2,7 @@
 name = "pest-deconstruct-derive"
 version = "0.2.0"
 authors = ["cad97 <cad97@cad97.com>"]
+description = "Internal implementation detail of pest-deconstruct"
 
 [lib]
 name = "derive"
