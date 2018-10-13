@@ -17,7 +17,6 @@ path = "./derive/"
 # This dependency is for examples only
 [dependencies.pest_derive]
 version = "2"
-git = "https://github.com/pest-parser/pest.git"
 optional = true
 
 [features]

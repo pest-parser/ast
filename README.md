@@ -1,5 +1,7 @@
 # pest-deconstruct
 
+This is an in-development addon to the pest parsing library.
+
 (Working title, also considered: `pest-ast`, `from-pest`, just making this part of `pest`)
 
 Pest-deconstruct provides a structured manner to go from the "dynamically typed" Pest Parse Tree
