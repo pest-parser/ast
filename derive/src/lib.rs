@@ -368,11 +368,22 @@ fn derive_FromPest_DataEnum(name: Ident, input: DataEnum) -> DeriveResult {
             }
         }).fold_results(vec![], accumulate)?;
 
+    let variant_names = input
+        .variants
+        .iter()
+        .map(|variant| variant.ident.clone())
+        .collect_vec();
+
     Ok(quote! {
         #(#variants)else* else {
             panic!(
-                "Unexpected {}{:?}",
-                stringify!(#name),
+                concat!(
+                    "Expected one of [",
+                    #(#variant_names,)*
+                    "] when parsing ",
+                    stringify!(#name),
+                    ", got {:?}"
+                ),
                 ::std::iter::repeat_with(|| it.next_untyped())
                     .take_while(Option::is_some)
                     .map(Option::unwrap)
