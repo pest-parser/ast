@@ -379,7 +379,7 @@ fn derive_FromPest_DataEnum(name: Ident, input: DataEnum) -> DeriveResult {
             panic!(
                 concat!(
                     "Expected one of [",
-                    #(#variant_names,)*
+                    #(stringify!(#variant_names), ", ",)*
                     "] when parsing ",
                     stringify!(#name),
                     ", got {:?}"
