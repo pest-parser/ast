@@ -1,45 +1,16 @@
 [workspace]
+members = ["derive"]
 
 [package]
-name = "pest-deconstruct"
+name = "from-pest"
 version = "0.2.0"
 authors = ["cad97 <cad97@cad97.com>"]
 readme = "./README.md"
 description = "Convert from a pest grammar to a typed AST"
 license = "MIT"
 
+[dependencies]
+void = "1.0"
+
 [dependencies.pest]
 version = "2"
-
-[dependencies.pest-deconstruct-derive]
-version = "0.2.0"
-path = "./derive/"
-
-# This dependency is for examples only
-[dependencies.pest_derive]
-version = "2"
-optional = true
-
-[features]
-# This feature is for examples only
-examples = ["pest_derive"]
-
-[[example]]
-name = "simple"
-path = "./examples/simple.rs"
-required-features = ["pest_derive"]
-
-[[example]]
-name = "csv"
-path = "./examples/csv.rs"
-required-features = ["pest_derive"]
-
-[[example]]
-name = "enums"
-path = "./examples/enums.rs"
-required-features = ["pest_derive"]
-
-[[example]]
-name = "parse"
-path = "./examples/parse.rs"
-required-features = ["pest_derive"]

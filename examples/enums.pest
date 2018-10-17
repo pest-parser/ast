@@ -1,7 +1,0 @@
-ident = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
-number = @{ ASCII_DIGIT+ }
-
-term = { ident | number }
-terms = { term+ }
-
-WHITESPACE = _{ WHITE_SPACE }
