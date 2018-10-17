@@ -79,28 +79,6 @@ impl<'pest, Rule: RuleType> FromPest<'pest> for Pair<'pest, Rule> {
     }
 }
 
-#[macro_export]
-#[allow(non_snake_case)]
-macro_rules! impl_FromPest_for_concrete {
-    ($Rule:ty) => {
-        impl<'pest> $crate::FromPest<'pest> for $crate::pest::Span<'pest> {
-            type Rule = $Rule;
-            type Error = $crate::NoRemainingPairs;
-            fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, NoRemainingPairs> {
-                Pair::from_pest(pest).map($crate::pest::iterators::Pair::into_span)
-            }
-        }
-
-        impl<'pest> $crate::FromPest<'pest> for () {
-            type Rule = $Rule;
-            type Error = $crate::void::Void;
-            fn from_pest(_: &mut Pairs<'pest, Rule>) -> Result<Self, $crate::void::Void> {
-                Ok(())
-            }
-        }
-    };
-}
-
 /// Error during conversion: no pairs remained to convert.
 #[derive(Debug, Default)]
 pub struct NoRemainingPairs {
@@ -131,13 +109,4 @@ impl<'pest, Rule: RuleType> PestInto<'pest, Rule> for Pairs<'pest, Rule> {
     fn convert<T: FromPest<'pest, Rule = Rule>>(&mut self) -> Result<T, T::Error> {
         T::from_pest(self)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-    pub enum Rule {}
-    impl_FromPest_for_concrete!(Rule);
 }

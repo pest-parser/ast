@@ -11,14 +11,11 @@ extern crate syn;
 extern crate quote;
 
 #[allow(non_snake_case)]
-#[proc_macro_derive(FromPest, attributes(pest::ast))]
+#[proc_macro_derive(FromPest, attributes(pest_ast))]
 pub fn derive_FromPest(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     syn::parse(input)
         .and_then(from_pest::derive)
-        .unwrap_or_else(|err| {
-            let err = err.to_compile_error();
-            quote!(#(#err;)*)
-        })
+        .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }
 

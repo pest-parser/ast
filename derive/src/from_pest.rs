@@ -1,13 +1,11 @@
-#![allow(clippy::needless_pass_by_value)]
-
 use {
     itertools::Itertools,
     proc_macro2::{Span, TokenStream},
     quote::ToTokens,
-    std::{path::PathBuf as FilePath},
+    std::path::PathBuf as FilePath,
     syn::{
         parse::Error, parse::Result, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
-        GenericParam, Ident, Path,
+        Field, Fields, Ident, Path,
     },
 };
 
@@ -70,15 +68,10 @@ pub(crate) fn derive(
         top_level_attributes(PestAstAttribute::from_attributes(attrs)?)?;
 
     let (from_pest_lifetime, did_synthesize_lifetime) = generics
-        .params
-        .iter()
-        .filter_map(|generic| match generic {
-            GenericParam::Lifetime(def) => Some(def.lifetime.clone()),
-            _ => None,
-        })
+        .lifetimes()
         .next()
-        .map(|lt| (lt, true))
-        .unwrap_or_else(|| (parse_quote!('unique_lifetime_name), false));
+        .map(|def| (def.lifetime.clone(), false))
+        .unwrap_or_else(|| (parse_quote!('unique_lifetime_name), true));
 
     let mut generics_ = generics.clone();
     let (_, ty_generics, where_clause) = generics.split_for_impl();
@@ -93,18 +86,15 @@ pub(crate) fn derive(
             data.union_token.span(),
             "Cannot derive FromPest for union",
         )),
-        Data::Struct(data) => {
-            derive_for_struct(grammar, name.clone(), rule_enum.clone(), rule_variant, data)
-        }
-        Data::Enum(data) => {
-            derive_for_enum(grammar, name.clone(), rule_enum.clone(), rule_variant, data)
-        }
+        Data::Struct(data) => derive_for_struct(grammar, &name, &rule_enum, &rule_variant, data),
+        Data::Enum(data) => derive_for_enum(grammar, &name, &rule_enum, &rule_variant, data),
     }?;
 
     Ok(quote! {
         impl #impl_generics ::from_pest::FromPest<#from_pest_lifetime> for #name #ty_generics #where_clause {
-            type Rule: ::from_pest::pest::RuleType = #rule_enum;
-            type Error = ::from_pest::void::Void;
+            type Rule = #rule_enum;
+            // TODO: Don't use `<Self as FromPest>::Error: From<NoneError>`?
+            type Error = ::std::option::NoneError;
 
             fn from_pest(
                 pest: &mut ::from_pest::pest::iterators::Pairs<#from_pest_lifetime, #rule_enum>
@@ -115,24 +105,172 @@ pub(crate) fn derive(
     })
 }
 
-#[allow(unused)]
-fn derive_for_struct(
-    grammar: Option<FilePath>,
-    name: Ident,
-    rule_enum: Path,
-    rule_variant: Ident,
-    DataStruct { fields, .. }: DataStruct,
-) -> Result<TokenStream> {
-    unimplemented!("Enums not reimplemented yet")
+#[derive(Clone, Debug)]
+enum ConversionStrategy {
+    FromPest,
+    Outer(Vec<Path>),
+    Inner(Vec<Path>),
 }
 
+impl ConversionStrategy {
+    fn for_struct_field(span: Span, attrs: Vec<PestAstAttribute>) -> Result<Self> {
+        let (strategy, _) = attrs
+            .into_iter()
+            .map(|attr| match attr {
+                PestAstAttribute::Outer(_) => Ok((Some(ConversionStrategy::Outer(vec![])), None)),
+                PestAstAttribute::Inner(_) => Ok((Some(ConversionStrategy::Inner(vec![])), None)),
+                PestAstAttribute::With(attr) => Ok((None, Some(attr.path))),
+                attr => Err(Error::new(attr.span(), "this attr not allowed here")),
+            })
+            .fold_results(
+                Ok((ConversionStrategy::FromPest, vec![])),
+                |acc: Result<_>, new| {
+                    let acc = acc?;
+                    Ok(match (acc, new) {
+                        (_, (Some(_), Some(_))) | (_, (None, None)) => unreachable!(),
+                        (_, (Some(ConversionStrategy::FromPest), _)) => unreachable!(),
+                        ((ConversionStrategy::FromPest, mut old), (None, Some(new))) => {
+                            old.push(new);
+                            (ConversionStrategy::FromPest, old)
+                        }
+                        ((ConversionStrategy::FromPest, old), (Some(strat), None)) => (strat, old),
+                        (
+                            (ConversionStrategy::Outer(_), _),
+                            (Some(ConversionStrategy::Outer(_)), _),
+                        ) => Err(Error::new(
+                            span,
+                            "cannot specify `#[pest::ast(outer)]` more than once",
+                        ))?,
+                        (
+                            (ConversionStrategy::Inner(_), _),
+                            (Some(ConversionStrategy::Inner(_)), _),
+                        ) => Err(Error::new(
+                            span,
+                            "cannot specify `#[pest::ast(inner)]` more than once",
+                        ))?,
+                        (
+                            (ConversionStrategy::Outer(_), _),
+                            (Some(ConversionStrategy::Inner(_)), _),
+                        )
+                        | (
+                            (ConversionStrategy::Inner(_), _),
+                            (Some(ConversionStrategy::Outer(_)), _),
+                        ) => Err(Error::new(
+                            span,
+                            "cannot specify both `#[pest::ast(inner)]` and `#[pest::ast(outer)]`",
+                        ))?,
+                        ((ConversionStrategy::Outer(mut old), _), (None, Some(new))) => {
+                            old.push(new);
+                            (ConversionStrategy::Outer(old), vec![])
+                        }
+                        ((ConversionStrategy::Inner(mut old), _), (None, Some(new))) => {
+                            old.push(new);
+                            (ConversionStrategy::Inner(old), vec![])
+                        }
+                    })
+                },
+            )??;
+        Ok(strategy)
+    }
+}
+
+fn transform(stream: TokenStream, fns: Vec<Path>) -> TokenStream {
+    fns.into_iter()
+        .rev()
+        .fold(stream, |stream, path| quote!(#path(#stream)))
+}
+
+fn derive_for_struct(
+    grammar: Option<FilePath>,
+    name: &Ident,
+    rule_enum: &Path,
+    rule_variant: &Ident,
+    DataStruct { fields, .. }: DataStruct,
+) -> Result<TokenStream> {
+    if let Some(_path) = grammar {
+        unimplemented!("Grammar introspection not implemented yet")
+    }
+
+    let (is_named, fields) = match fields {
+        Fields::Named(fields) => (true, fields.named.into_iter()),
+        Fields::Unnamed(fields) => (false, fields.unnamed.into_iter()),
+        fields @ Fields::Unit => Err(Error::new(
+            fields.span(),
+            "Cannot derive FromPest for unit struct",
+        ))?,
+    };
+    let fields: Vec<_> = fields
+        .map(|field: Field| {
+            let conversion = match ConversionStrategy::for_struct_field(
+                field.span(),
+                PestAstAttribute::from_attributes(field.attrs)?,
+            )? {
+                ConversionStrategy::FromPest => quote!(::from_pest::FromPest::from_pest(inner)?),
+                ConversionStrategy::Inner(transformation) => {
+                    let inner_str = quote!(pest.next()?.as_str());
+                    transform(inner_str, transformation)
+                }
+                ConversionStrategy::Outer(transformation) => {
+                    let outer_str = quote!(pest.as_str());
+                    transform(outer_str, transformation)
+                }
+            };
+            if false {
+                #[allow(warnings)]
+                let e: Error = unreachable!();
+                #[allow(warnings)]
+                Err(e) // type hint
+            } else {
+                Ok(if let Some(name) = field.ident {
+                    quote!(#name : #conversion)
+                } else {
+                    quote!(#conversion)
+                })
+            }
+        })
+        .fold_results(vec![], |mut acc: Vec<_>, t| {
+            acc.push(t);
+            acc
+        })?;
+
+    let construct = if is_named {
+        quote!(#name{#(#fields,)*})
+    } else {
+        quote!(#name(#(#fields),*))
+    };
+
+    Ok(quote! {
+        let clone = pest.clone();
+        let pair = pest.next()?;
+        if pair.as_rule() == #rule_enum::#rule_variant {
+            *pest = clone;
+            let span = pair.as_span();
+            let inner = pair.into_inner();
+            let this = #construct;
+            if inner.clone().next().is_some() {
+                panic!(
+                    concat!(
+                        "when converting ",
+                        stringify!(#rule_enum),
+                        ", found extraneous {:?}",
+                    ),
+                    inner,
+                )
+            }
+            Ok(this)
+        } else {
+            None?
+        }
+    })
+}
 
 #[allow(unused)]
+#[allow(clippy::needless_pass_by_value)]
 fn derive_for_enum(
     grammar: Option<FilePath>,
-    name: Ident,
-    rule_enum: Path,
-    rule_variant: Ident,
+    name: &Ident,
+    rule_enum: &Path,
+    rule_variant: &Ident,
     DataEnum { variants, .. }: DataEnum,
 ) -> Result<TokenStream> {
     unimplemented!("Enums not reimplemented yet")

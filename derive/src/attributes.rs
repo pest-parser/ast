@@ -6,7 +6,7 @@ use {
     quote::ToTokens,
     syn::{
         parse::{Error, Parse, ParseStream, Parser, Result},
-        punctuated::{Pair, Punctuated},
+        punctuated::Punctuated,
         spanned::Spanned,
         token::Paren,
         Attribute, Ident, LitStr, Path,
@@ -74,7 +74,7 @@ impl PestAstAttribute {
     }
 
     pub(crate) fn from_attribute(attr: Attribute) -> Result<Vec<Self>> {
-        if attr.path != parse_quote!(pest::ast) {
+        if attr.path != parse_quote!(pest_ast) {
             return Ok(vec![]);
         }
 
@@ -193,23 +193,28 @@ impl Parse for RuleAttribute {
         let rule = input.parse()?;
         let paren = parenthesized!(content in input);
         let mut path: Path = content.parse()?;
-        if let Some((variant, Some(sep))) = path.segments.pop().map(Pair::into_tuple) {
-            if variant.arguments.is_empty() {
-                Ok(RuleAttribute {
-                    rule,
-                    paren,
-                    path,
-                    sep,
-                    variant: variant.ident,
-                })
-            } else {
-                Err(Error::new(path.span(), "must be a path to enum variant"))
-            }
+        let (variant, _) = path.segments.pop().unwrap().into_tuple();
+        let sep = if path.segments.trailing_punct() {
+            // fix trailing punct
+            let (head, sep) = path.segments.pop().unwrap().into_tuple();
+            path.segments.push(head);
+            sep.unwrap()
         } else {
             Err(Error::new(
                 path.span(),
                 "must be a path to enum variant (both enum and variant)",
-            ))
+            ))?
+        };
+        if variant.arguments.is_empty() {
+            Ok(RuleAttribute {
+                rule,
+                paren,
+                path,
+                sep,
+                variant: variant.ident,
+            })
+        } else {
+            Err(Error::new(path.span(), "must be a path to enum variant"))
         }
     }
 }
