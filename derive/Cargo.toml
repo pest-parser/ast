@@ -18,3 +18,5 @@ itertools = "0.7"
 
 [dev-dependencies]
 from-pest = { path = ".." }
+pest = "2.0"
+pest_derive = "2.0"

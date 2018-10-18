@@ -1,7 +1,22 @@
 #[doc(hidden)]
 pub extern crate pest;
-#[doc(hidden)]
-pub extern crate void;
+
+// TODO(never_type): don't reinvent `!`/`void::Void` (requires `NoneError: From<!>`)
+/// This trait _only_ exists as a stable version of `!`.
+/// When `!` is stable, it will (probably) be used instead.
+pub enum Never {}
+
+impl From<Never> for NoneError {
+    fn from(never: Never) -> Self {
+        match never {}
+    }
+}
+
+// TODO(try_trait): don't reinvent `std::option::NoneError`
+/// This trait _only_ exists as a stable version of `std::option::NoneError`.
+/// When `std::option::NoneError` is stable, it will (probably) be used instead.
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct NoneError;
 
 use {
     pest::{
@@ -9,7 +24,6 @@ use {
         RuleType,
     },
     std::{error::Error, fmt, marker::PhantomData},
-    void::Void,
 };
 
 /// Potentially borrowing conversion from a pest parse tree.
@@ -47,8 +61,8 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
 /// Convert an optional production.
 impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for Option<T> {
     type Rule = Rule;
-    type Error = Void;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Void> {
+    type Error = Never;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Never> {
         let mut clone = pest.clone();
         Ok(T::from_pest(&mut clone).ok().map(|this| {
             *pest = clone;
@@ -57,11 +71,11 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
     }
 }
 
-/// Convert many productions. (If `<T as FromPest>::Error ~= Void`, this will be non-terminating.)
+/// Convert many productions. (If `<T as FromPest>::Error ~= !`, this will be non-terminating.)
 impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for Vec<T> {
     type Rule = Rule;
-    type Error = Void;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Void> {
+    type Error = Never;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Never> {
         let mut acc = vec![];
         while let Ok(this) = T::from_pest(pest) {
             acc.push(this);
