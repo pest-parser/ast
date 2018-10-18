@@ -2,82 +2,87 @@
 pub extern crate pest;
 extern crate void;
 
-use void::Void;
-
-// TODO(try_trait): don't reinvent `std::option::NoneError`
-/// This trait _only_ exists as a stable version of `std::option::NoneError`.
-/// When `std::option::NoneError` is stable, it will (probably) be used instead.
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct NoneError;
-
-// TODO(never_type): can be dropped if/when `NoneError: From<!>`
-impl From<Void> for NoneError {
-    fn from(never: Void) -> Self {
-        match never {}
-    }
-}
+#[doc(inline)]
+///
+/// # Note
+///
+/// This type will likely be replaced with just using `!` once `never_type` is stable.
+pub use void::Void;
 
 use {
     pest::{
         iterators::{Pair, Pairs},
         RuleType,
     },
-    std::{error::Error, fmt, marker::PhantomData},
+    std::marker::PhantomData,
 };
+
+/// An error that occurs during conversion.
+pub enum ConversionError<FatalError> {
+    NoMatch,
+    Malformed(FatalError),
+}
 
 /// Potentially borrowing conversion from a pest parse tree.
 pub trait FromPest<'pest>: Sized {
     /// The rule type for the parse tree this type corresponds to.
     type Rule: RuleType;
-    /// An error type during conversion.
-    type Error;
+    /// A fatal error during conversion.
+    type FatalError;
     /// Convert from a Pest parse tree.
     ///
-    /// If returning `Ok(_)`, `pest` has been updated to consume the converted `Pair`(s).
-    /// If returning `Err(_)`, `pest` has not been changed.
-    fn from_pest(pest: &mut Pairs<'pest, Self::Rule>) -> Result<Self, Self::Error>;
+    /// # Return type semantics
+    ///
+    /// - `Err(ConversionError::NoMatch)` => node not at head of the cursor, cursor unchanged
+    /// - `Err(ConversionError::Malformed)` => fatal error; node at head of the cursor but malformed
+    /// - `Ok` => success; the cursor has been updated past this node
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, ConversionError<Self::FatalError>>;
 }
 
 /// Convert a production without storing it.
 impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for PhantomData<T> {
     type Rule = Rule;
-    type Error = T::Error;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Self::Error> {
-        let _ = T::from_pest(pest)?;
-        Ok(std::marker::PhantomData)
+    type FatalError = T::FatalError;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<T::FatalError>> {
+        T::from_pest(pest).map(|_| PhantomData)
     }
 }
 
 /// For recursive grammars.
 impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for Box<T> {
     type Rule = Rule;
-    type Error = T::Error;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Self::Error> {
-        Ok(T::from_pest(pest)?.into())
+    type FatalError = T::FatalError;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<T::FatalError>> {
+        T::from_pest(pest).map(Box::new)
     }
 }
 
 /// Convert an optional production.
 impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for Option<T> {
     type Rule = Rule;
-    type Error = Void;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Void> {
-        let mut clone = pest.clone();
-        Ok(T::from_pest(&mut clone).ok().map(|this| {
-            *pest = clone;
-            this
-        }))
+    type FatalError = T::FatalError;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<T::FatalError>> {
+        match T::from_pest(pest) {
+            Err(ConversionError::NoMatch) => Ok(None),
+            result => result.map(Some),
+        }
     }
 }
 
-/// Convert many productions. (If `<T as FromPest>::Error ~= !`, this will be non-terminating.)
+/// Convert many productions. (If `<T as FromPest>` is non-advancing, this will be non-terminating.)
 impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for Vec<T> {
     type Rule = Rule;
-    type Error = Void;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, Void> {
+    type FatalError = T::FatalError;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<T::FatalError>> {
         let mut acc = vec![];
-        while let Ok(this) = T::from_pest(pest) {
-            acc.push(this);
+        loop {
+            match T::from_pest(pest) {
+                Ok(t) => acc.push(t),
+                Err(ConversionError::NoMatch) => break,
+                Err(error @ ConversionError::Malformed(_)) => return Err(error),
+            }
         }
         Ok(acc)
     }
@@ -86,40 +91,8 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
 /// Consume a production without doing any processing.
 impl<'pest, Rule: RuleType> FromPest<'pest> for Pair<'pest, Rule> {
     type Rule = Rule;
-    type Error = NoRemainingPairs;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, NoRemainingPairs> {
-        pest.next().ok_or_else(Default::default)
-    }
-}
-
-/// Error during conversion: no pairs remained to convert.
-#[derive(Debug, Default)]
-pub struct NoRemainingPairs {
-    non_exhaustive: (),
-}
-
-impl Error for NoRemainingPairs {}
-impl fmt::Display for NoRemainingPairs {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "expected any rule; ran out of input")
-    }
-}
-
-mod hidden {
-    pub trait Sealed {}
-}
-
-/// `From` : `Into` :: `FromPest` : `PestInto`. Gives you a `.convert()` on `Pairs`.
-///
-/// TODO: This name is horrible _do not keep it_!
-pub trait PestInto<'pest, Rule: RuleType>: hidden::Sealed {
-    /// Convert the head of this pest parse tree into a `FromPest` type.
-    fn convert<T: FromPest<'pest, Rule = Rule>>(&mut self) -> Result<T, T::Error>;
-}
-
-impl<'pest, Rule: RuleType> hidden::Sealed for Pairs<'pest, Rule> {}
-impl<'pest, Rule: RuleType> PestInto<'pest, Rule> for Pairs<'pest, Rule> {
-    fn convert<T: FromPest<'pest, Rule = Rule>>(&mut self) -> Result<T, T::Error> {
-        T::from_pest(self)
+    type FatalError = Void;
+    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<Void>> {
+        pest.next().ok_or(ConversionError::NoMatch)
     }
 }

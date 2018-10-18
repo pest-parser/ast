@@ -93,11 +93,11 @@ pub(crate) fn derive(
     Ok(quote! {
         impl #impl_generics ::from_pest::FromPest<#from_pest_lifetime> for #name #ty_generics #where_clause {
             type Rule = #rule_enum;
-            type Error = ::from_pest::NoneError;
+            type FatalError = ::from_pest::Void;
 
             fn from_pest(
                 pest: &mut ::from_pest::pest::iterators::Pairs<#from_pest_lifetime, #rule_enum>
-            ) -> ::std::result::Result<Self, Self::Error> {
+            ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
                 #implementation
             }
         }
@@ -208,7 +208,9 @@ fn derive_for_struct(
                     quote!(::from_pest::FromPest::from_pest(&mut inner)?)
                 }
                 ConversionStrategy::Inner(transformation) => {
-                    let inner_str = quote!(inner.next().ok_or(::from_pest::NoneError)?.as_span());
+                    let inner_str = quote! {
+                        inner.next().ok_or(::from_pest::ConversionError::NoMatch)?.as_span()
+                    };
                     transform(inner_str, transformation)
                 }
                 ConversionStrategy::Outer(transformation) => {
@@ -242,7 +244,7 @@ fn derive_for_struct(
 
     Ok(quote! {
         let clone = pest.clone();
-        let pair = pest.next().ok_or(::from_pest::NoneError)?;
+        let pair = pest.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         if pair.as_rule() == #rule_enum::#rule_variant {
             *pest = clone;
             let span = pair.as_span();
@@ -260,7 +262,7 @@ fn derive_for_struct(
             }
             Ok(this)
         } else {
-            Err(::from_pest::NoneError)
+            Err(::from_pest::ConversionError::NoMatch)
         }
     })
 }
