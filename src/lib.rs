@@ -3,10 +3,6 @@ pub extern crate pest;
 extern crate void;
 
 #[doc(inline)]
-///
-/// # Note
-///
-/// This type will likely be replaced with just using `!` once `never_type` is stable.
 pub use void::Void;
 
 use {
