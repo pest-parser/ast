@@ -248,11 +248,11 @@ fn derive_for_struct(
             let span = pair.as_span();
             let mut inner = pair.into_inner();
             let this = #construct;
-            if inner.clone().next().is_some() {
+            if inner.next().is_some() {
                 panic!(
                     concat!(
                         "when converting ",
-                        stringify!(#rule_enum),
+                        stringify!(#rule_variant),
                         ", found extraneous {:?}",
                     ),
                     inner,
