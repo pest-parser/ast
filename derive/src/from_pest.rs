@@ -246,7 +246,6 @@ fn derive_for_struct(
         let clone = pest.clone();
         let pair = pest.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         if pair.as_rule() == #rule_enum::#rule_variant {
-            *pest = clone;
             let span = pair.as_span();
             let mut inner = pair.into_inner();
             let this = #construct;
@@ -262,6 +261,7 @@ fn derive_for_struct(
             }
             Ok(this)
         } else {
+            *pest = clone;
             Err(::from_pest::ConversionError::NoMatch)
         }
     })

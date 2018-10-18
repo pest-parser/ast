@@ -18,6 +18,7 @@ use {
 };
 
 /// An error that occurs during conversion.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ConversionError<FatalError> {
     NoMatch,
     Malformed(FatalError),

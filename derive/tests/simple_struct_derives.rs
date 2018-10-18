@@ -7,7 +7,8 @@ extern crate from_pest;
 extern crate pest_ast;
 extern crate pest;
 
-//use pest::Parser;
+use pest::Parser;
+use from_pest::FromPest;
 
 #[derive(Parser)]
 #[grammar = "../tests/simple_struct_derives.pest"]
@@ -45,6 +46,12 @@ struct c<'pest> {
 }
 
 #[test]
-fn main() -> Result<(), Box<dyn std::any::Any>> {
-    Ok(())
+fn main() {
+    let source = "aaabbbccc";
+
+    let mut parse_tree = SimpleParser::parse(Rule::S, source).expect("parse success");
+    println!("parse tree = {:#?}", parse_tree);
+
+    let syntax_tree = S::from_pest(&mut parse_tree).expect("infallible");
+    println!("syntax tree = {:#?}", syntax_tree);
 }
