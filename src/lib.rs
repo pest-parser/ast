@@ -1,3 +1,5 @@
+//! The [`FromPest`] conversion framework to convert from pest trees into typed structure.
+
 #[doc(hidden)]
 pub extern crate pest;
 extern crate void;
@@ -16,7 +18,9 @@ use {
 /// An error that occurs during conversion.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ConversionError<FatalError> {
+    /// No match occurred: this node is not present here
     NoMatch,
+    /// Fatal error: this node is present but malformed
     Malformed(FatalError),
 }
 
