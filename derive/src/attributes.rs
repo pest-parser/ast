@@ -21,17 +21,20 @@ mod kw {
     custom_keyword!(rule);
 }
 
-pub(crate) enum PestAstAttribute {
-    /// grammar = "grammar.rs"
+/// `#[pest_ast(..)]` for the outer `#[derive(FromPest)]`
+pub(crate) enum DeriveAttribute {
+    /// `grammar = "grammar.rs"`
     Grammar(GrammarAttribute),
-    /// outer
-    Outer(OuterAttribute),
-    /// inner
-    Inner(InnerAttribute),
-    /// with(path::to)
-    With(WithAttribute),
-    /// rule(path::to)
+    /// `rule(path::to)`
     Rule(RuleAttribute),
+}
+
+/// `#[pest_ast(..)]` for fields in `#[derive(FromPest)]`
+pub(crate) enum FieldAttribute {
+    /// `outer(with(path::to),*)`
+    Outer(OuterAttribute),
+    /// `inner(rule(path::to), with(path::to),*)`
+    Inner(InnerAttribute),
 }
 
 pub(crate) struct GrammarAttribute {
@@ -42,10 +45,16 @@ pub(crate) struct GrammarAttribute {
 
 pub(crate) struct OuterAttribute {
     pub(crate) outer: kw::outer,
+    pub(crate) paren: Paren,
+    pub(crate) with: Punctuated<WithAttribute, Token![,]>,
 }
 
 pub(crate) struct InnerAttribute {
     pub(crate) inner: kw::inner,
+    pub(crate) paren: Paren,
+    pub(crate) rule: Option<RuleAttribute>,
+    pub(crate) comma: Option<Token![,]>,
+    pub(crate) with: Punctuated<WithAttribute, Token![,]>,
 }
 
 pub(crate) struct WithAttribute {
@@ -62,11 +71,11 @@ pub(crate) struct RuleAttribute {
     pub(crate) variant: Ident,
 }
 
-impl PestAstAttribute {
+impl DeriveAttribute {
     pub(crate) fn from_attributes(attrs: impl IntoIterator<Item = Attribute>) -> Result<Vec<Self>> {
         attrs
             .into_iter()
-            .map(PestAstAttribute::from_attribute)
+            .map(DeriveAttribute::from_attribute)
             .fold_results(vec![], |mut acc, t| {
                 acc.extend(t);
                 acc
@@ -91,33 +100,75 @@ impl PestAstAttribute {
     }
 }
 
-impl Parse for PestAstAttribute {
+impl FieldAttribute {
+    pub(crate) fn from_attributes(attrs: impl IntoIterator<Item = Attribute>) -> Result<Vec<Self>> {
+        attrs
+            .into_iter()
+            .map(FieldAttribute::from_attribute)
+            .fold_results(vec![], |mut acc, t| {
+                acc.extend(t);
+                acc
+            })
+    }
+
+    pub(crate) fn from_attribute(attr: Attribute) -> Result<Vec<Self>> {
+        if attr.path != parse_quote!(pest_ast) {
+            return Ok(vec![]);
+        }
+
+        Parser::parse2(
+            |input: ParseStream| {
+                let content;
+                parenthesized!(content in input);
+                let punctuated: Punctuated<_, Token![,]> =
+                    content.parse_terminated(Parse::parse)?;
+                Ok(punctuated.into_iter().collect_vec())
+            },
+            attr.tts,
+        )
+    }
+}
+
+impl Parse for DeriveAttribute {
     fn parse(input: ParseStream) -> Result<Self> {
         let lookahead = input.lookahead1();
         if lookahead.peek(kw::grammar) {
-            GrammarAttribute::parse(input).map(PestAstAttribute::Grammar)
-        } else if lookahead.peek(kw::outer) {
-            OuterAttribute::parse(input).map(PestAstAttribute::Outer)
-        } else if lookahead.peek(kw::inner) {
-            InnerAttribute::parse(input).map(PestAstAttribute::Inner)
-        } else if lookahead.peek(kw::with) {
-            WithAttribute::parse(input).map(PestAstAttribute::With)
+            GrammarAttribute::parse(input).map(DeriveAttribute::Grammar)
         } else if lookahead.peek(kw::rule) {
-            RuleAttribute::parse(input).map(PestAstAttribute::Rule)
+            RuleAttribute::parse(input).map(DeriveAttribute::Rule)
         } else {
             Err(lookahead.error())
         }
     }
 }
 
-impl ToTokens for PestAstAttribute {
+impl Parse for FieldAttribute {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let lookahead = input.lookahead1();
+        if lookahead.peek(kw::outer) {
+            OuterAttribute::parse(input).map(FieldAttribute::Outer)
+        } else if lookahead.peek(kw::inner) {
+            InnerAttribute::parse(input).map(FieldAttribute::Inner)
+        } else {
+            Err(lookahead.error())
+        }
+    }
+}
+
+impl ToTokens for DeriveAttribute {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            PestAstAttribute::Grammar(attr) => attr.to_tokens(tokens),
-            PestAstAttribute::Outer(attr) => attr.to_tokens(tokens),
-            PestAstAttribute::Inner(attr) => attr.to_tokens(tokens),
-            PestAstAttribute::With(attr) => attr.to_tokens(tokens),
-            PestAstAttribute::Rule(attr) => attr.to_tokens(tokens),
+            DeriveAttribute::Grammar(attr) => attr.to_tokens(tokens),
+            DeriveAttribute::Rule(attr) => attr.to_tokens(tokens),
+        }
+    }
+}
+
+impl ToTokens for FieldAttribute {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            FieldAttribute::Outer(attr) => attr.to_tokens(tokens),
+            FieldAttribute::Inner(attr) => attr.to_tokens(tokens),
         }
     }
 }
@@ -142,8 +193,11 @@ impl ToTokens for GrammarAttribute {
 
 impl Parse for OuterAttribute {
     fn parse(input: ParseStream) -> Result<Self> {
+        let content;
         Ok(OuterAttribute {
             outer: input.parse()?,
+            paren: parenthesized!(content in input),
+            with: content.parse_terminated(WithAttribute::parse)?,
         })
     }
 }
@@ -151,13 +205,29 @@ impl Parse for OuterAttribute {
 impl ToTokens for OuterAttribute {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.outer.to_tokens(tokens);
+        self.paren.surround(tokens, |tokens| {
+            self.with.to_tokens(tokens);
+        })
     }
 }
 
 impl Parse for InnerAttribute {
     fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        let inner = input.parse()?;
+        let paren = parenthesized!(content in input);
+        let (rule, comma) = if content.peek(kw::rule) {
+            (Some(input.parse()?), Some(input.parse()?))
+        } else {
+            (None, None)
+        };
+        let with = content.parse_terminated(WithAttribute::parse)?;
         Ok(InnerAttribute {
-            inner: input.parse()?,
+            inner,
+            paren,
+            rule,
+            comma,
+            with,
         })
     }
 }
@@ -165,6 +235,15 @@ impl Parse for InnerAttribute {
 impl ToTokens for InnerAttribute {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.inner.to_tokens(tokens);
+        self.paren.surround(tokens, |tokens| {
+            if let Some(rule) = &self.rule {
+                rule.to_tokens(tokens);
+            }
+            if let Some(comma) = &self.comma {
+                comma.to_tokens(tokens);
+            }
+            self.with.to_tokens(tokens);
+        })
     }
 }
 

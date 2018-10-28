@@ -4,9 +4,7 @@
 //! functions. This is important as manipulation is done over untyped `TokenStream`.
 
 use {
-    itertools::Itertools,
-    proc_macro2::{Span, TokenStream},
-    quote::ToTokens,
+    proc_macro2::TokenStream,
     std::path::PathBuf as FilePath,
     syn::{
         parse::Error, parse::Result, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
@@ -14,53 +12,9 @@ use {
     },
 };
 
-use attributes::PestAstAttribute;
+use attributes::DeriveAttribute;
 
 mod field;
-
-fn top_level_attributes(attrs: Vec<PestAstAttribute>) -> Result<(Option<FilePath>, Path, Ident)> {
-    if let (grammar, Some(rule_enum), Some(rule_variant)) = attrs
-        .into_iter()
-        .map(|attr| match attr {
-            PestAstAttribute::Grammar(attr) => Ok((Some(attr), None, None)),
-            PestAstAttribute::Rule(attr) => Ok((None, Some(attr.path), Some(attr.variant))),
-            attr => Err(Error::new(attr.span(), "this attr not allowed here")),
-        })
-        .fold_results(Ok((None, None, None)), |acc: Result<_>, next| {
-            let acc = acc?;
-            Ok(match (acc, next) {
-                ((a, None, None), (None, b, c)) => (a, b, c),
-                ((None, b, c), (a, None, None)) => (a, b, c),
-                ((Some(_), _, _), (Some(a), _, _)) => Err(Error::new(
-                    a.span(),
-                    "duplicate grammar specification not allowed",
-                ))?,
-                ((_, Some(_), _), (_, Some(b), _)) => Err(Error::new(
-                    b.span(),
-                    "duplicate rule enum specification not allowed",
-                ))?,
-                (_, (Some(_), Some(_), Some(_)))
-                | (_, (None, None, None))
-                | (_, (_, Some(_), None))
-                | (_, (_, None, Some(_)))
-                | ((_, None, Some(_)), _) => unreachable!(),
-            })
-        })?? {
-        Ok((
-            grammar.map(|grammar| {
-                let s = grammar.into_token_stream().to_string();
-                FilePath::from(s[1..s.len() - 1].to_string())
-            }),
-            rule_enum,
-            rule_variant,
-        ))
-    } else {
-        Err(Error::new(
-            Span::call_site(),
-            "Exactly one `#[pest_ast(rule(path::to))]` required",
-        ))
-    }
-}
 
 /// Creates implementation of `FromPest` for given derive input.
 ///
@@ -85,8 +39,39 @@ pub(crate) fn derive(
         ..
     }: DeriveInput,
 ) -> Result<TokenStream> {
-    let (grammar, rule_enum, rule_variant) =
-        top_level_attributes(PestAstAttribute::from_attributes(attrs)?)?;
+    let attrs = DeriveAttribute::from_attributes(attrs)?;
+
+    let grammar = {
+        let mut grammar_attrs = attrs.iter().filter_map(|attr| match attr {
+            DeriveAttribute::Grammar(attr) => Some(attr),
+            _ => None,
+        });
+        match (grammar_attrs.next(), grammar_attrs.next()) {
+            (Some(_), Some(attr)) => Err(Error::new(
+                attr.span(),
+                "duplicate #[pest_ast(grammar)] not allowed",
+            ))?,
+            (None, None) => None,
+            (Some(attr), None) => Some(FilePath::from(attr.lit.value())),
+            _ => unreachable!(),
+        }
+    };
+
+    let (rule_enum, rule_variant) = {
+        let mut rule_attrs = attrs.into_iter().filter_map(|attr| match attr {
+            DeriveAttribute::Rule(attr) => Some(attr),
+            _ => None,
+        });
+        match (rule_attrs.next(), rule_attrs.next()) {
+            (Some(_), Some(attr)) => Err(Error::new(
+                attr.span(),
+                "duplicate #[pest_ast(rule)] not allowed",
+            ))?,
+            (None, None) => Err(Error::new(name.span(), "#[pest_ast(rule)] required here"))?,
+            (Some(attr), None) => (attr.path, attr.variant),
+            _ => unreachable!(),
+        }
+    };
 
     let (from_pest_lifetime, did_synthesize_lifetime) = generics
         .lifetimes()

@@ -1,9 +1,12 @@
 use {
     proc_macro2::TokenStream,
-    syn::{parse::Error, parse::Result, spanned::Spanned, Fields, Ident, Index, Member, Path},
+    syn::{
+        parse::Error, parse::Result, parse_quote, spanned::Spanned, Fields, Ident, Index, Member,
+        Path,
+    },
 };
 
-use attributes::PestAstAttribute;
+use attributes::FieldAttribute;
 
 #[derive(Clone, Debug)]
 enum ConversionStrategy {
@@ -13,62 +16,27 @@ enum ConversionStrategy {
 }
 
 impl ConversionStrategy {
-    fn from_attrs(attrs: Vec<PestAstAttribute>) -> Result<Self> {
-        attrs
-            .into_iter()
-            .fold(Ok(ConversionStrategy::FromPest), |strategy, attr| {
-                match (strategy?, attr) {
-                    (ConversionStrategy::Outer(_), PestAstAttribute::Outer(attr)) => Err(
-                        Error::new(attr.span(), "duplicate `outer` attribute not allowed"),
-                    ),
-                    (ConversionStrategy::Inner(_, _), PestAstAttribute::Inner(attr)) => Err(
-                        Error::new(attr.span(), "duplicate `inner` attribute not allowed"),
-                    ),
-                    (ConversionStrategy::Inner(_, Some(_)), PestAstAttribute::Rule(attr)) => Err(
-                        Error::new(attr.span(), "duplicate `rule` attribute not allowed"),
-                    ),
-                    (ConversionStrategy::Outer(_), PestAstAttribute::Inner(attr)) => Err(
-                        Error::new(attr.span(), "cannot specify both `inner` and `outer`"),
-                    ),
-                    (ConversionStrategy::Inner(_, _), PestAstAttribute::Outer(attr)) => Err(
-                        Error::new(attr.span(), "cannot specify both `outer` and `inner`"),
-                    ),
-
-                    (ConversionStrategy::FromPest, PestAstAttribute::Outer(_)) => {
-                        Ok(ConversionStrategy::Outer(vec![]))
-                    }
-                    (ConversionStrategy::FromPest, PestAstAttribute::Inner(_)) => {
-                        Ok(ConversionStrategy::Inner(vec![], None))
-                    }
-                    (ConversionStrategy::FromPest, PestAstAttribute::With(attr)) => {
-                        Err(Error::new(
-                            attr.span(),
-                            "attribute only allowed after `inner` or `outer`",
-                        ))
-                    }
-
-                    (ConversionStrategy::Outer(mut with), PestAstAttribute::With(attr)) => {
-                        with.push(attr.path);
-                        Ok(ConversionStrategy::Outer(with))
-                    }
-
-                    (ConversionStrategy::Inner(mut with, rule), PestAstAttribute::With(attr)) => {
-                        with.push(attr.path);
-                        Ok(ConversionStrategy::Inner(with, rule))
-                    }
-                    (ConversionStrategy::Inner(with, None), PestAstAttribute::Rule(attr)) => {
-                        Ok(ConversionStrategy::Inner(with, Some(attr.path)))
-                    }
-
-                    (_, PestAstAttribute::Grammar(attr)) => {
-                        Err(Error::new(attr.span(), "attribute not allowed here"))
-                    }
-                    (_, PestAstAttribute::Rule(attr)) => Err(Error::new(
-                        attr.span(),
-                        "attribute only allowed after `inner`",
-                    )),
-                }
-            })
+    fn from_attrs(attrs: Vec<FieldAttribute>) -> Result<Self> {
+        let mut attrs = attrs.into_iter();
+        Ok(match (attrs.next(), attrs.next()) {
+            (Some(_), Some(attr)) => Err(Error::new(
+                attr.span(),
+                "only a single field attribute allowed",
+            ))?,
+            (None, None) => ConversionStrategy::FromPest,
+            (Some(FieldAttribute::Outer(attr)), None) => {
+                ConversionStrategy::Outer(attr.with.into_iter().map(|attr| attr.path).collect())
+            }
+            (Some(FieldAttribute::Inner(attr)), None) => ConversionStrategy::Inner(
+                attr.with.into_iter().map(|attr| attr.path).collect(),
+                attr.rule.map(|attr| {
+                    let path = attr.path;
+                    let variant = attr.variant;
+                    parse_quote!(#path::#variant)
+                }),
+            ),
+            _ => unreachable!(),
+        })
     }
 
     fn apply(self, _name: &Ident, member: Member) -> TokenStream {
@@ -126,7 +94,7 @@ pub fn convert(name: &Ident, fields: Fields) -> Result<TokenStream> {
                 .named
                 .into_iter()
                 .map(|field| {
-                    let attrs = PestAstAttribute::from_attributes(field.attrs)?;
+                    let attrs = FieldAttribute::from_attributes(field.attrs)?;
                     Ok(ConversionStrategy::from_attrs(attrs)?
                         .apply(name, Member::Named(field.ident.unwrap())))
                 })
@@ -139,7 +107,7 @@ pub fn convert(name: &Ident, fields: Fields) -> Result<TokenStream> {
                 .into_iter()
                 .enumerate()
                 .map(|(i, field)| {
-                    let attrs = PestAstAttribute::from_attributes(field.attrs)?;
+                    let attrs = FieldAttribute::from_attributes(field.attrs)?;
                     Ok(ConversionStrategy::from_attrs(attrs)?
                         .apply(name, Member::Unnamed(Index::from(i))))
                 })
