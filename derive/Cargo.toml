@@ -1,6 +1,6 @@
 [package]
 name = "pest-ast"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["cad97 <cad97@cad97.com>"]
 description = "Derive to convert from pest parse tree to typed syntax tree"
 license = "MIT"
