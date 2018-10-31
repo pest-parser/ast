@@ -1,0 +1,21 @@
+// <https://en.wikipedia.org/wiki/Parsing_expression_grammar>
+//
+// The parsing expression ('a'/'b')* matches and consumes an arbitrary-length
+// sequence of a's and b's. The production rule S ← 'a' S? 'b' describes the
+// simple context-free "matching language" $\{ `a^n b^n : n \geq 1 \}`$.
+// The following parsing expression grammar describes the classic
+// non-context-free language $`\{ a^n b^n c^n : n \geq 1 \}`$:
+//
+// ```peg
+// S ← &(A 'c') 'a'+ B !.
+// A ← 'a' A? 'b'
+// B ← 'b' B? 'c'
+// ```
+
+a = { "a" }
+b = { "b" }
+c = { "c" }
+
+S = { &(A ~ c) ~ a+ ~ B ~ !ANY }
+A = _{ a ~ A? ~ b }
+B = _{ b ~ B? ~ c }

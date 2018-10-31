@@ -1,3 +1,0 @@
-Term = { ASCII_DIGIT }
-Expr = { Term ~ Op ~ Term }
-Op = { "+" | "-" }

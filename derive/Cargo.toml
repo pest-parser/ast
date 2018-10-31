@@ -1,17 +1,22 @@
 [package]
-name = "pest-deconstruct-derive"
-version = "0.2.0"
+name = "pest-ast"
+version = "0.3.0"
 authors = ["cad97 <cad97@cad97.com>"]
 description = "Internal implementation detail of pest-deconstruct"
 license = "MIT"
 
 [lib]
-name = "derive"
+name = "pest_ast"
 proc-macro = true
 
 [dependencies]
-syn = "0.15"
+syn = { version = "0.15", features = ["extra-traits"] }
 quote = "0.6"
 proc-macro2 = "0.4"
-single = "1.0.0"
-itertools = "0.7.8"
+single = "1.0"
+itertools = "0.7"
+
+[dev-dependencies]
+from-pest = { version = "0.3", path = ".." }
+pest = "2.0"
+pest_derive = "2.0"
