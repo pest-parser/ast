@@ -144,7 +144,7 @@ fn derive_for_struct(
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = #construct;
-            if inner.next().is_some() {
+            if inner.clone().next().is_some() {
                 panic!(
                     concat!(
                         "when converting ",
@@ -200,7 +200,7 @@ fn derive_for_enum(
                     let mut inner = pair.clone().into_inner();
                     let inner = &mut inner;
                     let this = #construct_variant;
-                    if inner.next().is_some() {
+                    if inner.clone().next().is_some() {
                         panic!(
                             concat!(
                                 "when converting ",
