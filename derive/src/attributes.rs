@@ -217,7 +217,7 @@ impl Parse for InnerAttribute {
         let inner = input.parse()?;
         let paren = parenthesized!(content in input);
         let (rule, comma) = if content.peek(kw::rule) {
-            (Some(input.parse()?), Some(input.parse()?))
+            (Some(content.parse()?), Some(content.parse()?))
         } else {
             (None, None)
         };
