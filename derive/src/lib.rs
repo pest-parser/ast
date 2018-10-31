@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![recursion_limit = "128"]
+#![recursion_limit = "150"]
 
 extern crate itertools;
 extern crate proc_macro;

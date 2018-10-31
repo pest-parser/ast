@@ -4,11 +4,12 @@
 //! functions. This is important as manipulation is done over untyped `TokenStream`.
 
 use {
+    itertools::Itertools,
     proc_macro2::TokenStream,
-    std::path::PathBuf as FilePath,
+    std::{iter, path::PathBuf as FilePath},
     syn::{
         parse::Error, parse::Result, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
-        Ident, Path, Variant,
+        Ident, Path,
     },
 };
 
@@ -147,7 +148,7 @@ fn derive_for_struct(
                 panic!(
                     concat!(
                         "when converting ",
-                        stringify!(#rule_variant),
+                        stringify!(#name),
                         ", found extraneous {:?}",
                     ),
                     inner,
@@ -174,38 +175,45 @@ fn derive_for_enum(
         unimplemented!("Grammar introspection not implemented yet")
     }
 
+    let variant_name = variants
+        .iter()
+        .map(|variant| variant.ident.clone())
+        .collect_vec();
+
     let construct_variant: Vec<TokenStream> = variants
         .into_iter()
-        .map(|variant: Variant| {
+        .map(|variant| {
             let variant_name = variant.ident;
             field::convert(&parse_quote!(#name::#variant_name), variant.fields)
         })
         .collect::<Result<_>>()?;
 
+    let name = iter::repeat(name.clone()).take(variant_name.len());
+
     Ok(quote! {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         if pair.as_rule() == #rule_enum::#rule_variant {
-            let span = pair.as_span();
-            let (this, mut inner) = Err(::from_pest::ConversionError::NoMatch)
+            let this = Err(::from_pest::ConversionError::NoMatch)
                 #(.or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
-                    let mut __inner = pair.clone().into_inner();
-                    let this = {
-                        let inner = &mut __inner;
-                        #construct_variant
-                    };
-                    Ok((this, __inner))
+                    let span = pair.as_span();
+                    let mut inner = pair.clone().into_inner();
+                    let inner = &mut inner;
+                    let this = #construct_variant;
+                    if inner.next().is_some() {
+                        panic!(
+                            concat!(
+                                "when converting ",
+                                stringify!(#name),
+                                "::",
+                                stringify!(#variant_name),
+                                ", found extraneous {:?}",
+                            ),
+                            inner,
+                        )
+                    }
+                    Ok(this)
                 }))*?;
-            if inner.next().is_some() {
-                panic!(
-                    concat!(
-                        "when converting ",
-                        stringify!(#rule_variant),
-                        ", found extraneous {:?}",
-                    ),
-                    inner,
-                )
-            }
             *pest = clone;
             Ok(this)
         } else {
