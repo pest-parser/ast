@@ -1,10 +1,8 @@
-# pest-deconstruct
+# pest-ast
 
-This is an in-development addon to the pest parsing library.
+This is an in-development add-on to the pest parsing library.
 
-(Working title, also considered: `pest-ast`, `from-pest`, just making this part of `pest`)
-
-Pest-deconstruct provides a structured manner to go from the "dynamically typed" Pest Parse Tree
+Pest-ast provides a structured manner to go from the "dynamically typed" Pest Parse Tree
 to a strongly typed (Abstract) Syntax Tree, as well as a derive to do so automatically.
 In the future, it's planned to optionally additionally check the source grammar to statically
 prevent issues that are currently detected at runtime.
@@ -12,6 +10,13 @@ prevent issues that are currently detected at runtime.
 In the _future_ 🦄, pest-ast may provide a way of defining grammar directly on the AST nodes.
 
 This library is now dogfooded for the [nafi](https://github.com/nafi-lang/rust-nafi) programming language.
+
+## Note:
+
+This crate is actually `from-pest`, which provides the trait framework for the said conversion.
+[`pest-ast`](./derive/README.md) provides the actual derive for the conversion.
+
+This README is the root of the repository for legacy reasons. This will be corrected in a future reorganization.
 
 ## Contributing
 

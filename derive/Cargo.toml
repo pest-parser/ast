@@ -1,9 +1,11 @@
 [package]
 name = "pest-ast"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["cad97 <cad97@cad97.com>"]
-description = "Internal implementation detail of pest-deconstruct"
+description = "Derive to convert from pest parse tree to typed syntax tree"
 license = "MIT"
+readme = "./README.md"
+repository = "https://github.com/pest-parser/pest_deconstruct"
 
 [lib]
 name = "pest_ast"
