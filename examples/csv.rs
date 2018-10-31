@@ -78,3 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[test]
+fn csv_example_runs() {
+    main().unwrap()
+}
