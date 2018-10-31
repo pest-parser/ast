@@ -11,6 +11,8 @@ license = "MIT"
 
 [dependencies]
 void = "1.0"
+pest = "2"
 
-[dependencies.pest]
-version = "2"
+[dev-dependencies]
+pest_derive = "2"
+pest-ast = { version = "0.2", path = "derive" }
