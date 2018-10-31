@@ -1,5 +1,5 @@
 use {
-    proc_macro2::TokenStream,
+    proc_macro2::{Span, TokenStream},
     syn::{
         parse::Error, parse::Result, parse_quote, spanned::Spanned, Fields, Index, Member, Path,
     },
@@ -10,8 +10,8 @@ use attributes::FieldAttribute;
 #[derive(Clone, Debug)]
 enum ConversionStrategy {
     FromPest,
-    Outer(Vec<Path>),
-    Inner(Vec<Path>, Option<Path>),
+    Outer(Span, Vec<Path>),
+    Inner(Span, Vec<Path>, Option<Path>),
 }
 
 impl ConversionStrategy {
@@ -23,10 +23,12 @@ impl ConversionStrategy {
                 "only a single field attribute allowed",
             ))?,
             (None, None) => ConversionStrategy::FromPest,
-            (Some(FieldAttribute::Outer(attr)), None) => {
-                ConversionStrategy::Outer(attr.with.into_iter().map(|attr| attr.path).collect())
-            }
+            (Some(FieldAttribute::Outer(attr)), None) => ConversionStrategy::Outer(
+                attr.span(),
+                attr.with.into_iter().map(|attr| attr.path).collect(),
+            ),
             (Some(FieldAttribute::Inner(attr)), None) => ConversionStrategy::Inner(
+                attr.span(),
                 attr.with.into_iter().map(|attr| attr.path).collect(),
                 attr.rule.map(|attr| {
                     let path = attr.path;
@@ -41,11 +43,13 @@ impl ConversionStrategy {
     fn apply(self, member: Member) -> TokenStream {
         let conversion = match self {
             ConversionStrategy::FromPest => quote!(::from_pest::FromPest::from_pest(inner)?),
-            ConversionStrategy::Outer(mods) => with_mods(quote!(span.clone()), mods),
-            ConversionStrategy::Inner(mods, rule) => {
+            ConversionStrategy::Outer(span, mods) => {
+                with_mods(quote_spanned!(span=>span.clone()), mods)
+            }
+            ConversionStrategy::Inner(span, mods, rule) => {
                 let pair = quote!(inner.next().ok_or(::from_pest::ConversionError::NoMatch)?);
-                let span = if let Some(rule) = rule {
-                    quote! {{
+                let get_span = if let Some(rule) = rule {
+                    quote_spanned! {span=>{
                         let pair = #pair;
                         if pair.as_rule() == #rule {
                             pair.as_span()
@@ -67,9 +71,9 @@ impl ConversionStrategy {
                         }
                     }}
                 } else {
-                    quote!(#pair.as_span())
+                    quote_spanned!(span=>#pair.as_span())
                 };
-                with_mods(span, mods)
+                with_mods(get_span, mods)
             }
         };
         if let Member::Named(name) = member {
@@ -82,7 +86,6 @@ impl ConversionStrategy {
 
 fn with_mods(stream: TokenStream, mods: Vec<Path>) -> TokenStream {
     mods.into_iter()
-        .rev()
         .fold(stream, |stream, path| quote!(#path(#stream)))
 }
 
