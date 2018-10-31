@@ -3,7 +3,7 @@ members = ["derive"]
 
 [package]
 name = "from-pest"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["cad97 <cad97@cad97.com>"]
 readme = "./README.md"
 description = "Convert from a pest grammar to a typed AST"
@@ -11,8 +11,8 @@ license = "MIT"
 
 [dependencies]
 void = "1.0"
-pest = "2"
+pest = "2.0"
 
 [dev-dependencies]
-pest_derive = "2"
-pest-ast = { version = "0.2", path = "derive" }
+pest_derive = "2.0"
+pest-ast = { version = "0.3", path = "derive" }

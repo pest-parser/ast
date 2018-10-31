@@ -1,6 +1,6 @@
 [package]
 name = "pest-ast"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["cad97 <cad97@cad97.com>"]
 description = "Internal implementation detail of pest-deconstruct"
 license = "MIT"
@@ -17,6 +17,6 @@ single = "1.0"
 itertools = "0.7"
 
 [dev-dependencies]
-from-pest = { path = ".." }
+from-pest = { version = "0.3", path = ".." }
 pest = "2.0"
 pest_derive = "2.0"
