@@ -8,7 +8,7 @@ use {
     std::path::PathBuf as FilePath,
     syn::{
         parse::Error, parse::Result, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
-        Ident, Path,
+        Ident, Path, Variant,
     },
 };
 
@@ -133,7 +133,7 @@ fn derive_for_struct(
         unimplemented!("Grammar introspection not implemented yet")
     }
 
-    let construct = field::convert(name, fields)?;
+    let construct = field::convert(&parse_quote!(#name), fields)?;
 
     Ok(quote! {
         let mut clone = pest.clone();
@@ -170,5 +170,46 @@ fn derive_for_enum(
     rule_variant: &Ident,
     DataEnum { variants, .. }: DataEnum,
 ) -> Result<TokenStream> {
-    unimplemented!("Enums not reimplemented yet")
+    if let Some(_path) = grammar {
+        unimplemented!("Grammar introspection not implemented yet")
+    }
+
+    let construct_variant: Vec<TokenStream> = variants
+        .into_iter()
+        .map(|variant: Variant| {
+            let variant_name = variant.ident;
+            field::convert(&parse_quote!(#name::#variant_name), variant.fields)
+        })
+        .collect::<Result<_>>()?;
+
+    Ok(quote! {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() == #rule_enum::#rule_variant {
+            let span = pair.as_span();
+            let (this, mut inner) = Err(::from_pest::ConversionError::NoMatch)
+                #(.or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
+                    let mut __inner = pair.clone().into_inner();
+                    let this = {
+                        let inner = &mut __inner;
+                        #construct_variant
+                    };
+                    Ok((this, __inner))
+                }))*?;
+            if inner.next().is_some() {
+                panic!(
+                    concat!(
+                        "when converting ",
+                        stringify!(#rule_variant),
+                        ", found extraneous {:?}",
+                    ),
+                    inner,
+                )
+            }
+            *pest = clone;
+            Ok(this)
+        } else {
+            Err(::from_pest::ConversionError::NoMatch)
+        }
+    })
 }

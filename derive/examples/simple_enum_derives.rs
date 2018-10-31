@@ -11,18 +11,8 @@ use from_pest::FromPest;
 use pest::Parser;
 
 #[derive(Parser)]
-#[grammar = "../tests/simple_struct_derives.pest"]
+#[grammar = "../examples/simple_enum_derives.pest"]
 pub struct SimpleParser;
-
-#[derive(FromPest, Debug)]
-#[pest_ast(rule(Rule::S))]
-struct S<'pest> {
-    #[pest_ast(outer())]
-    span: pest::Span<'pest>,
-    a: Vec<a<'pest>>,
-    b: Vec<b<'pest>>,
-    c: Vec<c<'pest>>,
-}
 
 #[derive(FromPest, Debug)]
 #[pest_ast(rule(Rule::a))]
@@ -45,13 +35,26 @@ struct c<'pest> {
     span: pest::Span<'pest>,
 }
 
-#[test]
+#[derive(FromPest, Debug)]
+#[pest_ast(rule(Rule::abc))]
+enum abc<'pest> {
+    a(a<'pest>),
+    b(b<'pest>),
+    c(c<'pest>),
+}
+
+#[derive(FromPest, Debug)]
+#[pest_ast(rule(Rule::ABC))]
+struct ABC<'pest> {
+    abc: Vec<abc<'pest>>,
+}
+
 fn main() {
     let source = "aaabbbccc";
 
-    let mut parse_tree = SimpleParser::parse(Rule::S, source).expect("parse success");
+    let mut parse_tree = SimpleParser::parse(Rule::ABC, source).expect("parse success");
     println!("parse tree = {:#?}", parse_tree);
 
-    let syntax_tree = S::from_pest(&mut parse_tree).expect("infallible");
+    let syntax_tree = ABC::from_pest(&mut parse_tree).expect("infallible");
     println!("syntax tree = {:#?}", syntax_tree);
 }

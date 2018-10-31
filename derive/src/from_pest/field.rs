@@ -1,8 +1,7 @@
 use {
     proc_macro2::TokenStream,
     syn::{
-        parse::Error, parse::Result, parse_quote, spanned::Spanned, Fields, Ident, Index, Member,
-        Path,
+        parse::Error, parse::Result, parse_quote, spanned::Spanned, Fields, Index, Member, Path,
     },
 };
 
@@ -39,7 +38,7 @@ impl ConversionStrategy {
         })
     }
 
-    fn apply(self, _name: &Ident, member: Member) -> TokenStream {
+    fn apply(self, member: Member) -> TokenStream {
         let conversion = match self {
             ConversionStrategy::FromPest => quote!(::from_pest::FromPest::from_pest(inner)?),
             ConversionStrategy::Outer(mods) => with_mods(quote!(span.clone()), mods),
@@ -87,7 +86,7 @@ fn with_mods(stream: TokenStream, mods: Vec<Path>) -> TokenStream {
         .fold(stream, |stream, path| quote!(#path(#stream)))
 }
 
-pub fn convert(name: &Ident, fields: Fields) -> Result<TokenStream> {
+pub fn convert(name: &Path, fields: Fields) -> Result<TokenStream> {
     Ok(match fields {
         Fields::Named(fields) => {
             let fields: Vec<_> = fields
@@ -96,7 +95,7 @@ pub fn convert(name: &Ident, fields: Fields) -> Result<TokenStream> {
                 .map(|field| {
                     let attrs = FieldAttribute::from_attributes(field.attrs)?;
                     Ok(ConversionStrategy::from_attrs(attrs)?
-                        .apply(name, Member::Named(field.ident.unwrap())))
+                        .apply(Member::Named(field.ident.unwrap())))
                 })
                 .collect::<Result<_>>()?;
             quote!(#name{#(#fields,)*})
@@ -109,7 +108,7 @@ pub fn convert(name: &Ident, fields: Fields) -> Result<TokenStream> {
                 .map(|(i, field)| {
                     let attrs = FieldAttribute::from_attributes(field.attrs)?;
                     Ok(ConversionStrategy::from_attrs(attrs)?
-                        .apply(name, Member::Unnamed(Index::from(i))))
+                        .apply(Member::Unnamed(Index::from(i))))
                 })
                 .collect::<Result<_>>()?;
             quote!(#name(#(#fields),*))
