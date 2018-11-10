@@ -20,11 +20,13 @@ This README is the root of the repository for legacy reasons. This will be corre
 
 ## Contributing
 
-See the current list of [[good first issue] issues](
-https://github.com/pest-parser/pest_deconstruct/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-If you have questions, don't be afraid to @ the author (CAD97) on the [pest Gitter channel](
-https://gitter.im/dragostis/pest).
-
+Check out the [issue tracker](https://github.com/pest-parser/ast);
+we try to keep it stocked with [good-first-issue](https://github.com/pest-parser/ast/labels/good%20first%20issue)
+and [help-wanted](https://github.com/pest-parser/ast/issues?q=is%3Aopen+label%3A%22help+wanted%22) opportunities.
+If you have questions, don't be afraid to @ the author (CAD97)
+[on Gitter](https://gitter.im/pest-parser/pest) or [on Discord](https://discord.gg/FuPE9JE).
+The best thing you can probably do for this library currently is to use it!
+More than anything else, I just want eyes on the interface trying it out and seeing where it shines and wher it falters.
 
 ## License
 
