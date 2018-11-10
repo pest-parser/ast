@@ -97,3 +97,31 @@ impl<'pest, Rule: RuleType> FromPest<'pest> for Pair<'pest, Rule> {
         pest.next().ok_or(ConversionError::NoMatch)
     }
 }
+
+macro_rules! impl_for_tuple {
+    () => {};
+    ($ty1:ident $($ty:ident)*) => {
+        impl<'pest, $ty1, $($ty,)* Rule: RuleType, FatalError> FromPest<'pest> for ($ty1, $($ty),*)
+        where
+            $ty1: FromPest<'pest, Rule=Rule, FatalError=FatalError>,
+            $($ty: FromPest<'pest, Rule=Rule, FatalError=FatalError>,)*
+        {
+            type Rule = Rule;
+            type FatalError = FatalError;
+            fn from_pest(pest: &mut Pairs<'pest, Rule>)
+                -> Result<Self, ConversionError<FatalError>>
+            {
+                let mut clone = pest.clone();
+                let this = (
+                    $ty1::from_pest(&mut clone)?,
+                    $($ty::from_pest(&mut clone)?),*
+                );
+                *pest = clone;
+                Ok(this)
+            }
+        }
+        impl_for_tuple!($($ty)*);
+    };
+}
+
+impl_for_tuple!(A B C D);
