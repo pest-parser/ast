@@ -24,6 +24,34 @@ pub enum ConversionError<FatalError> {
     Malformed(FatalError),
 }
 
+use std::fmt;
+
+impl<FatalError> fmt::Display for ConversionError<FatalError>
+where
+    FatalError: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ConversionError::NoMatch => write!(f, "Rule did not match, failed to convert node"),
+            ConversionError::Malformed(fatalerror) => write!(f, "Malformed node: {}", fatalerror),
+        }
+    }
+}
+
+use std::error;
+
+impl<FatalError> error::Error for ConversionError<FatalError>
+where
+    FatalError: error::Error + 'static,
+{
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            ConversionError::NoMatch => None,
+            ConversionError::Malformed(ref fatalerror) => Some(fatalerror),
+        }
+    }
+}
+
 /// Potentially borrowing conversion from a pest parse tree.
 pub trait FromPest<'pest>: Sized {
     /// The rule type for the parse tree this type corresponds to.
