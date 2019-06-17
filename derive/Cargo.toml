@@ -22,3 +22,6 @@ itertools = "0.7"
 from-pest = { version = "0.3", path = ".." }
 pest = "2.0"
 pest_derive = "2.0"
+
+[features]
+trace = [] # enabling this will require you to add `log` as a dependency to _your_ crate
