@@ -136,6 +136,9 @@ fn derive_for_struct(
 
     let construct = field::convert(&parse_quote!(#name), fields)?;
 
+    let extraneous =
+        ::trace(quote! { "when converting {}, found extraneous {:?}", stringify!(#name), inner});
+
     Ok(quote! {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
@@ -145,14 +148,10 @@ fn derive_for_struct(
             let inner = &mut inner;
             let this = #construct;
             if inner.clone().next().is_some() {
-                panic!(
-                    concat!(
-                        "when converting ",
-                        stringify!(#name),
-                        ", found extraneous {:?}",
-                    ),
-                    inner,
-                )
+                #extraneous
+                Err(::from_pest::ConversionError::Extraneous {
+                    current_node: stringify!(#name),
+                })?;
             }
             *pest = clone;
             Ok(this)
