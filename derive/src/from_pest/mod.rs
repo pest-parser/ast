@@ -4,9 +4,8 @@
 //! functions. This is important as manipulation is done over untyped `TokenStream`.
 
 use {
-    itertools::Itertools,
     proc_macro2::TokenStream,
-    std::{iter, path::PathBuf as FilePath},
+    std::{path::PathBuf as FilePath},
     syn::{
         parse::Error, parse::Result, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
         Ident, Path,
@@ -174,20 +173,30 @@ fn derive_for_enum(
         unimplemented!("Grammar introspection not implemented yet")
     }
 
-    let variant_name = variants
-        .iter()
-        .map(|variant| variant.ident.clone())
-        .collect_vec();
-
-    let construct_variant: Vec<TokenStream> = variants
+    let convert_variants: Vec<TokenStream> = variants
         .into_iter()
         .map(|variant| {
             let variant_name = variant.ident;
-            field::convert(&parse_quote!(#name::#variant_name), variant.fields)
+            let construct_variant = field::convert(&parse_quote!(#name::#variant_name), variant.fields)?;
+            let extraneous = ::trace(quote! {
+                "when converting {}, found extraneous {:?}", stringify!(#name), stringify!(#variant_name)
+            });
+
+            Ok(quote! {
+                let span = pair.as_span();
+                let mut inner = pair.clone().into_inner();
+                let inner = &mut inner;
+                let this = #construct_variant;
+                if inner.clone().next().is_some() {
+                    #extraneous
+                    Err(::from_pest::ConversionError::Extraneous {
+                        current_node: stringify!(#variant_name),
+                    })?;
+                }
+                Ok(this)
+            })
         })
         .collect::<Result<_>>()?;
-
-    let name = iter::repeat(name.clone()).take(variant_name.len());
 
     Ok(quote! {
         let mut clone = pest.clone();
@@ -195,23 +204,7 @@ fn derive_for_enum(
         if pair.as_rule() == #rule_enum::#rule_variant {
             let this = Err(::from_pest::ConversionError::NoMatch)
                 #(.or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
-                    let span = pair.as_span();
-                    let mut inner = pair.clone().into_inner();
-                    let inner = &mut inner;
-                    let this = #construct_variant;
-                    if inner.clone().next().is_some() {
-                        panic!(
-                            concat!(
-                                "when converting ",
-                                stringify!(#name),
-                                "::",
-                                stringify!(#variant_name),
-                                ", found extraneous {:?}",
-                            ),
-                            inner,
-                        )
-                    }
-                    Ok(this)
+                    #convert_variants
                 }))*?;
             *pest = clone;
             Ok(this)
