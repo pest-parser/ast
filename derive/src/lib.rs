@@ -27,7 +27,7 @@ mod from_pest;
 
 #[cfg(feature = "trace")]
 fn trace(t: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    quote! { ::log::trace!( #t ); }
+    quote! { ::from_pest::log::trace!( #t ); }
 }
 
 #[cfg(not(feature = "trace"))]
