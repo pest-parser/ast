@@ -24,6 +24,8 @@ pub enum ConversionError<FatalError> {
     NoMatch,
     /// Fatal error: this node is present but malformed
     Malformed(FatalError),
+    /// Found unexpected tokens at the end
+    Extraneous { current_node: &'static str },
 }
 
 use std::fmt;
@@ -36,6 +38,7 @@ where
         match self {
             ConversionError::NoMatch => write!(f, "Rule did not match, failed to convert node"),
             ConversionError::Malformed(fatalerror) => write!(f, "Malformed node: {}", fatalerror),
+            ConversionError::Extraneous { current_node, .. } => write!(f, "when converting {}, found extraneous tokens", current_node),
         }
     }
 }
@@ -49,6 +52,7 @@ where
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
             ConversionError::NoMatch => None,
+            ConversionError::Extraneous { .. } => None,
             ConversionError::Malformed(ref fatalerror) => Some(fatalerror),
         }
     }
@@ -112,7 +116,7 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
             match T::from_pest(pest) {
                 Ok(t) => acc.push(t),
                 Err(ConversionError::NoMatch) => break,
-                Err(error @ ConversionError::Malformed(_)) => return Err(error),
+                Err(error) => return Err(error),
             }
         }
         Ok(acc)

@@ -31,6 +31,6 @@ fn trace(t: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 }
 
 #[cfg(not(feature = "trace"))]
-fn trace(t: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn trace(_t: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     quote! {}
 }
