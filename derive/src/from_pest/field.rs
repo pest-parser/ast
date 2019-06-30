@@ -6,6 +6,7 @@ use {
 };
 
 use attributes::FieldAttribute;
+use ::trace;
 
 #[derive(Clone, Debug)]
 enum ConversionStrategy {
@@ -49,11 +50,22 @@ impl ConversionStrategy {
             ConversionStrategy::Inner(span, mods, rule) => {
                 let pair = quote!(inner.next().ok_or(::from_pest::ConversionError::NoMatch)?);
                 let get_span = if let Some(rule) = rule {
+                    let error_msg = trace(quote! {
+                        concat!(
+                            "in ",
+                            stringify!(#member),
+                            ", expected `",
+                            stringify!(#rule),
+                            "` but found `{:?}`"
+                        ),
+                        pair.as_rule(),
+                    });
                     quote_spanned! {span=>{
                         let pair = #pair;
                         if pair.as_rule() == #rule {
                             pair.as_span()
                         } else {
+                            #error_msg
                             return Err(::from_pest::ConversionError::NoMatch)
                             // TODO: Should this be panicking instead?
                             // panic!(

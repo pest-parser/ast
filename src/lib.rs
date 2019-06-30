@@ -3,6 +3,8 @@
 #[doc(hidden)]
 pub extern crate pest;
 extern crate void;
+#[doc(hidden)]
+pub extern crate log;
 
 #[doc(inline)]
 pub use void::Void;

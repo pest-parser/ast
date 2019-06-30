@@ -22,3 +22,7 @@ itertools = "0.7"
 from-pest = { version = "0.3", path = ".." }
 pest = "2.0"
 pest_derive = "2.0"
+
+[features]
+default = ["trace"]
+trace = []

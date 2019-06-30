@@ -24,3 +24,13 @@ pub fn derive_FromPest(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 
 mod attributes;
 mod from_pest;
+
+#[cfg(feature = "trace")]
+fn trace(t: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! { ::from_pest::log::trace!( #t ); }
+}
+
+#[cfg(not(feature = "trace"))]
+fn trace(t: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {}
+}
