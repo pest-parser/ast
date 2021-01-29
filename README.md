@@ -9,8 +9,6 @@ prevent issues that are currently detected at runtime.
 
 In the _future_ 🦄, pest-ast may provide a way of defining grammar directly on the AST nodes.
 
-This library is now dogfooded for the [nafi](https://github.com/nafi-lang/rust-nafi) programming language.
-
 ## Note:
 
 This crate is actually `from-pest`, which provides the trait framework for the said conversion.
