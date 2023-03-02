@@ -15,7 +15,6 @@ proc-macro = true
 syn = { version = "0.15", features = ["extra-traits"] }
 quote = "0.6"
 proc-macro2 = "0.4"
-single = "1.0"
 itertools = "0.7"
 
 [dev-dependencies]
