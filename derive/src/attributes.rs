@@ -1,5 +1,7 @@
 #![allow(clippy::mixed_read_write_in_expression)] // syn patterns
 
+use proc_macro2::TokenTree;
+
 use {
     itertools::Itertools,
     proc_macro2::TokenStream,
@@ -22,6 +24,7 @@ mod kw {
 }
 
 /// `#[pest_ast(..)]` for the outer `#[derive(FromPest)]`
+#[derive(Debug)]
 pub(crate) enum DeriveAttribute {
     /// `grammar = "grammar.rs"`
     Grammar(GrammarAttribute),
@@ -37,6 +40,7 @@ pub(crate) enum FieldAttribute {
     Inner(InnerAttribute),
 }
 
+#[derive(Debug)]
 pub(crate) struct GrammarAttribute {
     pub(crate) grammar: kw::grammar,
     pub(crate) eq: Token![=],
@@ -63,6 +67,7 @@ pub(crate) struct WithAttribute {
     pub(crate) path: Path,
 }
 
+#[derive(Debug)]
 pub(crate) struct RuleAttribute {
     pub(crate) rule: kw::rule,
     pub(crate) paren: Paren,
@@ -83,19 +88,32 @@ impl DeriveAttribute {
     }
 
     pub(crate) fn from_attribute(attr: Attribute) -> Result<Vec<Self>> {
-        if attr.path != parse_quote!(pest_ast) {
+        if attr.path() != &parse_quote!(pest_ast) {
             return Ok(vec![]);
         }
 
         Parser::parse2(
             |input: ParseStream| {
                 let content;
-                parenthesized!(content in input);
+                input.parse::<Token![#]>()?;
+                bracketed!(content in input);
+                content.step(|cursor| {
+                    if let Some((tt, next)) = cursor.token_tree() {
+                        match tt {
+                            TokenTree::Ident(id) if id == "pest_ast" => Ok(((), next)),
+                            _ => Err(cursor.error("expected `pest_ast`")),
+                        }
+                    } else {
+                        Err(cursor.error("expected `pest_ast`"))
+                    }
+                })?;
+                let content2;
+                parenthesized!(content2 in content);
                 let punctuated: Punctuated<_, Token![,]> =
-                    content.parse_terminated(Parse::parse)?;
+                    content2.parse_terminated(Parse::parse, Token![,])?;
                 Ok(punctuated.into_iter().collect_vec())
             },
-            attr.tokens,
+            attr.to_token_stream(),
         )
     }
 }
@@ -112,19 +130,32 @@ impl FieldAttribute {
     }
 
     pub(crate) fn from_attribute(attr: Attribute) -> Result<Vec<Self>> {
-        if attr.path != parse_quote!(pest_ast) {
+        if attr.path() != &parse_quote!(pest_ast) {
             return Ok(vec![]);
         }
 
         Parser::parse2(
             |input: ParseStream| {
+                input.parse::<Token![#]>()?;
                 let content;
-                parenthesized!(content in input);
+                bracketed!(content in input);
+                content.step(|cursor| {
+                    if let Some((tt, next)) = cursor.token_tree() {
+                        match tt {
+                            TokenTree::Ident(id) if id == "pest_ast" => Ok(((), next)),
+                            _ => Err(cursor.error("expected `pest_ast`")),
+                        }
+                    } else {
+                        Err(cursor.error("expected `pest_ast`"))
+                    }
+                })?;
+                let content2;
+                parenthesized!(content2 in content);
                 let punctuated: Punctuated<_, Token![,]> =
-                    content.parse_terminated(Parse::parse)?;
+                    content2.parse_terminated(Parse::parse, Token![,])?;
                 Ok(punctuated.into_iter().collect_vec())
             },
-            attr.tokens,
+            attr.to_token_stream(),
         )
     }
 }
@@ -197,7 +228,7 @@ impl Parse for OuterAttribute {
         Ok(OuterAttribute {
             outer: input.parse()?,
             paren: parenthesized!(content in input),
-            with: content.parse_terminated(WithAttribute::parse)?,
+            with: content.parse_terminated(WithAttribute::parse, Token![,])?,
         })
     }
 }
@@ -221,7 +252,7 @@ impl Parse for InnerAttribute {
         } else {
             (None, None)
         };
-        let with = content.parse_terminated(WithAttribute::parse)?;
+        let with = content.parse_terminated(WithAttribute::parse, Token![,])?;
         Ok(InnerAttribute {
             inner,
             paren,
