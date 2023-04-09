@@ -13,10 +13,10 @@ name = "pest_ast"
 proc-macro = true
 
 [dependencies]
-syn = { version = "0.15", features = ["extra-traits"] }
-quote = "0.6"
-proc-macro2 = "0.4"
-itertools = "0.7"
+syn = { version = "1", features = ["extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+itertools = "0.10"
 
 [dev-dependencies]
 from-pest = { version = "0.3", path = ".." }

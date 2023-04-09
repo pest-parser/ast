@@ -76,7 +76,7 @@ impl DeriveAttribute {
         attrs
             .into_iter()
             .map(DeriveAttribute::from_attribute)
-            .fold_results(vec![], |mut acc, t| {
+            .fold_ok(vec![], |mut acc, t| {
                 acc.extend(t);
                 acc
             })
@@ -95,7 +95,7 @@ impl DeriveAttribute {
                     content.parse_terminated(Parse::parse)?;
                 Ok(punctuated.into_iter().collect_vec())
             },
-            attr.tts,
+            attr.tokens,
         )
     }
 }
@@ -105,7 +105,7 @@ impl FieldAttribute {
         attrs
             .into_iter()
             .map(FieldAttribute::from_attribute)
-            .fold_results(vec![], |mut acc, t| {
+            .fold_ok(vec![], |mut acc, t| {
                 acc.extend(t);
                 acc
             })
@@ -124,7 +124,7 @@ impl FieldAttribute {
                     content.parse_terminated(Parse::parse)?;
                 Ok(punctuated.into_iter().collect_vec())
             },
-            attr.tts,
+            attr.tokens,
         )
     }
 }
