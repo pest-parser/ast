@@ -1,10 +1,10 @@
 //! The [`FromPest`] conversion framework to convert from pest trees into typed structure.
 
 #[doc(hidden)]
+pub extern crate log;
+#[doc(hidden)]
 pub extern crate pest;
 extern crate void;
-#[doc(hidden)]
-pub extern crate log;
 
 #[doc(inline)]
 pub use void::Void;
@@ -38,7 +38,11 @@ where
         match self {
             ConversionError::NoMatch => write!(f, "Rule did not match, failed to convert node"),
             ConversionError::Malformed(fatalerror) => write!(f, "Malformed node: {}", fatalerror),
-            ConversionError::Extraneous { current_node, .. } => write!(f, "when converting {}, found extraneous tokens", current_node),
+            ConversionError::Extraneous { current_node, .. } => write!(
+                f,
+                "when converting {}, found extraneous tokens",
+                current_node
+            ),
         }
     }
 }

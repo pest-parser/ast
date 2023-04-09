@@ -1,4 +1,4 @@
-#![allow(bad_style)]
+#![allow(bad_style, dead_code)]
 
 // Unfortunately, you currently have to import all four of these.
 // We're considering what it would look like to make this redundant,
@@ -51,7 +51,7 @@ mod ast {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use ast::File;
+    use crate::ast::File;
     use from_pest::FromPest;
     use pest::Parser;
     use std::fs;

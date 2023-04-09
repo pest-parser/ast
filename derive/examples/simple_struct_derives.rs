@@ -1,4 +1,4 @@
-#![allow(bad_style)]
+#![allow(bad_style, dead_code)]
 
 #[macro_use]
 extern crate pest_derive;

@@ -1,4 +1,4 @@
-#![allow(clippy::eval_order_dependence)] // syn patterns
+#![allow(clippy::mixed_read_write_in_expression)] // syn patterns
 
 use {
     itertools::Itertools,
@@ -217,7 +217,7 @@ impl Parse for InnerAttribute {
         let inner = input.parse()?;
         let paren = parenthesized!(content in input);
         let (rule, comma) = if content.peek(kw::rule) {
-            (Some(content.parse()?), content.parse().ok().and_then(Some))
+            (Some(content.parse()?), content.parse().ok())
         } else {
             (None, None)
         };

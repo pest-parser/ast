@@ -5,8 +5,8 @@ use {
     },
 };
 
-use attributes::FieldAttribute;
-use ::trace;
+use crate::attributes::FieldAttribute;
+use crate::trace;
 
 #[derive(Clone, Debug)]
 enum ConversionStrategy {

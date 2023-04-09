@@ -3,18 +3,19 @@ members = ["derive"]
 
 [package]
 name = "from-pest"
-version = "0.3.1"
+version = "0.3.2"
+edition = "2021"
 authors = ["cad97 <cad97@cad97.com>"]
 readme = "./README.md"
 description = "Convert from a pest grammar to a typed AST"
-license = "MIT"
+license = "MIT/Apache-2.0"
 repository = "https://github.com/pest-parser/pest_deconstruct"
 
 [dependencies]
 void = "1.0"
-pest = "2.0"
+pest = "2.5"
 log = "0.4.6"
 
 [dev-dependencies]
-pest_derive = "2.0"
+pest_derive = "2.5"
 pest-ast = { version = "0.3", path = "derive" }

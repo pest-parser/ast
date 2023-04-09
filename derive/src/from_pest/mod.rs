@@ -5,14 +5,14 @@
 
 use {
     proc_macro2::TokenStream,
-    std::{path::PathBuf as FilePath},
+    std::path::PathBuf as FilePath,
     syn::{
         parse::Error, parse::Result, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
         Ident, Path,
     },
 };
 
-use attributes::DeriveAttribute;
+use crate::attributes::DeriveAttribute;
 
 mod field;
 
@@ -135,8 +135,9 @@ fn derive_for_struct(
 
     let construct = field::convert(&parse_quote!(#name), fields)?;
 
-    let extraneous =
-        ::trace(quote! { "when converting {}, found extraneous {:?}", stringify!(#name), inner});
+    let extraneous = crate::trace(
+        quote! { "when converting {}, found extraneous {:?}", stringify!(#name), inner},
+    );
 
     Ok(quote! {
         let mut clone = pest.clone();
@@ -178,7 +179,7 @@ fn derive_for_enum(
         .map(|variant| {
             let variant_name = variant.ident;
             let construct_variant = field::convert(&parse_quote!(#name::#variant_name), variant.fields)?;
-            let extraneous = ::trace(quote! {
+            let extraneous = crate::trace(quote! {
                 "when converting {}, found extraneous {:?}", stringify!(#name), stringify!(#variant_name)
             });
 

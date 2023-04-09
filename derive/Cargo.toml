@@ -1,9 +1,10 @@
 [package]
 name = "pest-ast"
-version = "0.3.3"
+version = "0.3.4"
+edition = "2021"
 authors = ["cad97 <cad97@cad97.com>"]
 description = "Derive to convert from pest parse tree to typed syntax tree"
-license = "MIT"
+license = "MIT/Apache-2.0"
 readme = "./README.md"
 repository = "https://github.com/pest-parser/pest_deconstruct"
 
@@ -19,8 +20,8 @@ itertools = "0.7"
 
 [dev-dependencies]
 from-pest = { version = "0.3", path = ".." }
-pest = "2.0"
-pest_derive = "2.0"
+pest = "2.5"
+pest_derive = "2.5"
 
 [features]
 default = ["trace"]
