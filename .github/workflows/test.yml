@@ -1,0 +1,31 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: cargo test and examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --all --all-features
+      - run: cargo run --example csv
+      - run: cd derive && cargo run --example simple_enum_derives && cargo run --example simple_struct_derives
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+  lint:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --all --all-features --all-targets -- -Dwarnings
