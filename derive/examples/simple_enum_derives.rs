@@ -1,4 +1,9 @@
-#![allow(bad_style, dead_code)]
+#![allow(
+    bad_style,
+    dead_code,
+    clippy::clone_on_copy,
+    clippy::upper_case_acronyms
+)]
 
 #[macro_use]
 extern crate pest_derive;

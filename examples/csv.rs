@@ -1,4 +1,9 @@
-#![allow(bad_style, dead_code)]
+#![allow(
+    bad_style,
+    dead_code,
+    clippy::clone_on_copy,
+    clippy::upper_case_acronyms
+)]
 
 // Unfortunately, you currently have to import all four of these.
 // We're considering what it would look like to make this redundant,
