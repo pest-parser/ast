@@ -13,7 +13,7 @@ name = "pest_ast"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1", features = ["extra-traits"] }
+syn = { version = "2", features = ["extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
 itertools = "0.10"
