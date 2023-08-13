@@ -44,9 +44,7 @@ impl ConversionStrategy {
     fn apply(self, member: Member) -> TokenStream {
         let conversion = match self {
             ConversionStrategy::FromPest => quote!(::from_pest::FromPest::from_pest(inner)?),
-            ConversionStrategy::Outer(span, mods) => {
-                with_mods(quote_spanned!(span=>span.clone()), mods)
-            }
+            ConversionStrategy::Outer(span, mods) => with_mods(quote_spanned!(span=>span), mods),
             ConversionStrategy::Inner(span, mods, rule) => {
                 let pair = quote!(inner.next().ok_or(::from_pest::ConversionError::NoMatch)?);
                 let get_span = if let Some(rule) = rule {
