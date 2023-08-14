@@ -1,10 +1,3 @@
-#![allow(
-    bad_style,
-    dead_code,
-    clippy::clone_on_copy,
-    clippy::upper_case_acronyms
-)]
-
 // Unfortunately, you currently have to import all four of these.
 // We're considering what it would look like to make this redundant,
 // and then you'd only need pest and pest-ast.
@@ -47,12 +40,12 @@ mod ast {
     #[pest_ast(rule(Rule::file))]
     pub struct File {
         pub records: Vec<Record>,
-        eoi: EOI,
+        _eoi: Eoi,
     }
 
     #[derive(Debug, FromPest)]
     #[pest_ast(rule(Rule::EOI))]
-    struct EOI;
+    struct Eoi;
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
