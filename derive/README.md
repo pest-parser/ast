@@ -178,7 +178,7 @@ Which would you rather have?
     }
 ]
 ```
-<details>
+</details>
 <details><summary>Typed Syntax Tree</summary>
 
 ```
