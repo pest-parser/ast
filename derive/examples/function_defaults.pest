@@ -1,0 +1,18 @@
+// Grammar for a simple language with function declarations
+// Functions can have optional return types that default to "void"
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+// Basic types
+id = { ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+type_name = { "void" | "int" | "string" | id }
+
+// Function parameter
+param = { id ~ ":" ~ type_name }
+params = { param ~ ("," ~ param)* }
+
+// Function declaration with optional return type
+function = { "fn" ~ id ~ "(" ~ params? ~ ")" ~ ("->" ~ type_name)? ~ "{" ~ "}" }
+
+// Program is a sequence of functions
+program = { function* }

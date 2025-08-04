@@ -3,7 +3,7 @@ members = ["derive"]
 
 [package]
 name = "from-pest"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 authors = ["cad97 <cad97@cad97.com>"]
 readme = "./README.md"

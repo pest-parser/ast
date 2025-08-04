@@ -21,6 +21,7 @@ mod kw {
     custom_keyword!(inner);
     custom_keyword!(with);
     custom_keyword!(rule);
+    custom_keyword!(default);
 }
 
 /// `#[pest_ast(..)]` for the outer `#[derive(FromPest)]`
@@ -39,6 +40,8 @@ pub(crate) enum FieldAttribute {
     Outer(OuterAttribute),
     /// `inner(rule(path::to), with(path::to),*)`
     Inner(InnerAttribute),
+    /// `default(expr)`
+    Default(DefaultAttribute),
 }
 
 #[derive(Debug)]
@@ -78,6 +81,13 @@ pub(crate) struct RuleAttribute {
     pub(crate) path: Path,
     pub(crate) sep: Token![::],
     pub(crate) variant: Ident,
+}
+
+#[derive(Debug)]
+pub(crate) struct DefaultAttribute {
+    pub(crate) default: kw::default,
+    pub(crate) paren: Paren,
+    pub(crate) expr: syn::Expr,
 }
 
 impl DeriveAttribute {
@@ -184,6 +194,8 @@ impl Parse for FieldAttribute {
             OuterAttribute::parse(input).map(FieldAttribute::Outer)
         } else if lookahead.peek(kw::inner) {
             InnerAttribute::parse(input).map(FieldAttribute::Inner)
+        } else if lookahead.peek(kw::default) {
+            DefaultAttribute::parse(input).map(FieldAttribute::Default)
         } else {
             Err(lookahead.error())
         }
@@ -204,6 +216,7 @@ impl ToTokens for FieldAttribute {
         match self {
             FieldAttribute::Outer(attr) => attr.to_tokens(tokens),
             FieldAttribute::Inner(attr) => attr.to_tokens(tokens),
+            FieldAttribute::Default(attr) => attr.to_tokens(tokens),
         }
     }
 }
@@ -340,6 +353,26 @@ impl ToTokens for RuleAttribute {
             self.path.to_tokens(tokens);
             self.sep.to_tokens(tokens);
             self.variant.to_tokens(tokens);
+        });
+    }
+}
+
+impl Parse for DefaultAttribute {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        Ok(DefaultAttribute {
+            default: input.parse()?,
+            paren: parenthesized!(content in input),
+            expr: content.parse()?,
+        })
+    }
+}
+
+impl ToTokens for DefaultAttribute {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.default.to_tokens(tokens);
+        self.paren.surround(tokens, |tokens| {
+            self.expr.to_tokens(tokens);
         });
     }
 }
