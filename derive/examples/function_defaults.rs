@@ -20,15 +20,13 @@ use pest::Parser;
 pub struct FunctionParser;
 
 // Define a simple enum for types that can have a default
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Type {
     #[default]
     Void,
     Int,
     String,
 }
-
 
 // Implement FromPest for Type
 impl<'pest> FromPest<'pest> for Type {

@@ -38,10 +38,9 @@ where
         match self {
             ConversionError::NoMatch => write!(f, "Rule did not match, failed to convert node"),
             ConversionError::Malformed(fatalerror) => write!(f, "Malformed node: {fatalerror}"),
-            ConversionError::Extraneous { current_node, .. } => write!(
-                f,
-                "when converting {current_node}, found extraneous tokens"
-            ),
+            ConversionError::Extraneous { current_node, .. } => {
+                write!(f, "when converting {current_node}, found extraneous tokens")
+            }
         }
     }
 }
