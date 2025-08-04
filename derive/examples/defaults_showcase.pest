@@ -1,0 +1,21 @@
+// Simple grammar showcasing default values
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+// Variable declarations with optional types and initialization
+var_decl = { var_kind ~ id ~ type_annotation? ~ initializer? ~ ";" }
+var_kind = { "let" | "const" }
+type_annotation = { ":" ~ type_name }
+initializer = { "=" ~ expr }
+
+// Expressions
+expr = { number | string | id }
+number = { ASCII_DIGIT+ }
+string = { "\"" ~ (!("\"") ~ ANY)* ~ "\"" }
+
+// Basic constructs
+id = { ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+type_name = { "int" | "string" | "bool" | "void" }
+
+// Program
+program = { var_decl* }

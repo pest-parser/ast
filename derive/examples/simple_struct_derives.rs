@@ -54,8 +54,8 @@ fn main() {
     let source = "aaabbbccc";
 
     let mut parse_tree = SimpleParser::parse(Rule::S, source).expect("parse success");
-    println!("parse tree = {:#?}", parse_tree);
+    println!("parse tree = {parse_tree:#?}");
 
     let syntax_tree = S::from_pest(&mut parse_tree).expect("infallible");
-    println!("syntax tree = {:#?}", syntax_tree);
+    println!("syntax tree = {syntax_tree:#?}");
 }

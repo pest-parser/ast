@@ -56,9 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source = String::from_utf8(fs::read("./examples/csv.csv")?)?;
     let mut parse_tree = csv::Parser::parse(csv::Rule::file, &source)?;
-    println!("parse tree = {:#?}", parse_tree);
+    println!("parse tree = {parse_tree:#?}");
     let syntax_tree: File = File::from_pest(&mut parse_tree).expect("infallible");
-    println!("syntax tree = {:#?}", syntax_tree);
+    println!("syntax tree = {syntax_tree:#?}");
     println!();
 
     let mut field_sum = 0.0;
@@ -71,8 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("Sum of fields: {}", field_sum);
-    println!("Number of records: {}", record_count);
+    println!("Sum of fields: {field_sum}");
+    println!("Number of records: {record_count}");
 
     Ok(())
 }

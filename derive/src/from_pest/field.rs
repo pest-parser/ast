@@ -15,6 +15,7 @@ enum ConversionStrategy {
     FromPest,
     Outer(Span, Vec<Path>),
     Inner(Span, Vec<Path>, Option<Path>),
+    Default(Span, syn::Expr),
 }
 
 impl ConversionStrategy {
@@ -39,6 +40,9 @@ impl ConversionStrategy {
                     parse_quote!(#path::#variant)
                 }),
             ),
+            (Some(FieldAttribute::Default(attr)), None) => {
+                ConversionStrategy::Default(attr.span(), attr.expr)
+            }
             _ => unreachable!(),
         })
     }
@@ -86,6 +90,18 @@ impl ConversionStrategy {
                     quote_spanned!(span=>#pair.as_span())
                 };
                 with_mods(get_span, mods)
+            }
+            ConversionStrategy::Default(span, default_expr) => {
+                // For default strategy, we try to parse as normal FromPest,
+                // but if it fails (NoMatch), we use the default value
+                quote_spanned! {span=> {
+                    // Try to parse using FromPest first
+                    match ::from_pest::FromPest::from_pest(inner) {
+                        Ok(value) => value,
+                        Err(::from_pest::ConversionError::NoMatch) => #default_expr,
+                        Err(e) => return Err(e),
+                    }
+                }}
             }
         };
         if let Member::Named(name) = member {

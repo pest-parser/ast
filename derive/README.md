@@ -306,3 +306,66 @@ And doing the actual parse is as simple as
 let mut parse_tree = csv::Parser::parse(csv::Rule::file, &source)?;
 let syntax_tree = File::from_pest(&mut parse_tree).expect("infallible");
 ```
+
+## Default Values for Optional Rules
+
+A powerful feature for handling optional grammar rules without requiring `Option<T>` in your AST is the `#[pest_ast(default(...))]` attribute. This allows you to specify default values that will be used when optional rules are not present in the input.
+
+### The Problem
+
+When using optional rules in Pest grammar, you typically need `Option<T>` in your AST:
+
+```rust
+// Grammar: function = { "fn" ~ id ~ ("->" ~ type)? ~ "{" ~ "}" }
+
+#[derive(FromPest, Debug)]
+#[pest_ast(rule(Rule::function))]
+pub struct Function {
+    pub name: String,
+    pub return_type: Option<Type>, // Optional field
+}
+```
+
+### The Solution
+
+With the `default` attribute, you can eliminate `Option<T>` and specify a default value:
+
+```rust
+#[derive(FromPest, Debug)]
+#[pest_ast(rule(Rule::function))]
+pub struct Function {
+    pub name: String,
+    
+    #[pest_ast(default(Type::Void))] // Specify default value
+    pub return_type: Type,           // No Option<T> needed!
+}
+```
+
+### Usage Examples
+
+```rust
+// Simple defaults
+#[pest_ast(default(Type::Void))]
+pub return_type: Type,
+
+// Complex defaults with expressions
+#[pest_ast(default(Vec::new()))]
+pub parameters: Vec<Parameter>,
+
+#[pest_ast(default({
+    Config {
+        debug: false,
+        optimization_level: 2,
+    }
+}))]
+pub config: Config,
+```
+
+### How It Works
+
+The `default` attribute generates code that:
+1. First tries to parse the field normally using `FromPest`
+2. If conversion fails with `NoMatch` (optional rule not present), uses the default value
+3. If parsing fails with other errors, propagates the error
+
+This provides a clean, type-safe way to handle optional grammar elements while keeping your AST representation simple and avoiding the complexity of `Option<T>` handling.
