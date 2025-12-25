@@ -151,12 +151,17 @@ fn derive_for_struct(
                 #extraneous
                 Err(::from_pest::ConversionError::Extraneous {
                     current_node: stringify!(#name),
+                    extraneous: format!("{:?}", inner.clone().map(|p| p.as_rule()).collect::<Vec<_>>()),
                 })?;
             }
             *pest = clone;
             Ok(this)
         } else {
-            Err(::from_pest::ConversionError::NoMatch)
+            Err(::from_pest::ConversionError::NoMatchWithInfo {
+                current_node: stringify!(#name),
+                expected: stringify!(#rule_variant),
+                actual: format!("{:?}", pair.as_rule()),
+            })
         }
     })
 }
@@ -192,6 +197,7 @@ fn derive_for_enum(
                     #extraneous
                     Err(::from_pest::ConversionError::Extraneous {
                         current_node: stringify!(#variant_name),
+                        extraneous: format!("{:?}", inner.clone().map(|p| p.as_rule()).collect::<Vec<_>>()),
                     })?;
                 }
                 Ok(this)
@@ -210,7 +216,11 @@ fn derive_for_enum(
             *pest = clone;
             Ok(this)
         } else {
-            Err(::from_pest::ConversionError::NoMatch)
+            Err(::from_pest::ConversionError::NoMatchWithInfo {
+                current_node: stringify!(#name),
+                expected: stringify!(#rule_variant),
+                actual: format!("{:?}", pair.as_rule()),
+            })
         }
     })
 }

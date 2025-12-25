@@ -18,14 +18,38 @@ use {
 };
 
 /// An error that occurs during conversion.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ConversionError<FatalError> {
     /// No match occurred: this node is not present here
     NoMatch,
+    /// No match occurred with detailed information.
+    /// `current_node` is the AST node being parsed.
+    /// `expected` is the rule that was expected.
+    /// `actual` is the rule that was actually found.
+    NoMatchWithInfo {
+        current_node: &'static str,
+        expected: &'static str,
+        actual: String,
+    },
     /// Fatal error: this node is present but malformed
     Malformed(FatalError),
-    /// Found unexpected tokens at the end
-    Extraneous { current_node: &'static str },
+    /// Found unexpected tokens at the end.
+    /// `current_node` is the AST node being parsed.
+    /// `extraneous` is a description of the extraneous tokens found.
+    Extraneous {
+        current_node: &'static str,
+        extraneous: String,
+    },
+}
+
+impl<FatalError> ConversionError<FatalError> {
+    /// Returns true if this error represents a "no match" situation.
+    pub fn is_no_match(&self) -> bool {
+        matches!(
+            self,
+            ConversionError::NoMatch | ConversionError::NoMatchWithInfo { .. }
+        )
+    }
 }
 
 use std::fmt;
@@ -37,9 +61,23 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ConversionError::NoMatch => write!(f, "Rule did not match, failed to convert node"),
+            ConversionError::NoMatchWithInfo {
+                current_node,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "when converting {current_node}, expected {expected}, but found {actual}"
+            ),
             ConversionError::Malformed(fatalerror) => write!(f, "Malformed node: {fatalerror}"),
-            ConversionError::Extraneous { current_node, .. } => {
-                write!(f, "when converting {current_node}, found extraneous tokens")
+            ConversionError::Extraneous {
+                current_node,
+                extraneous,
+            } => {
+                write!(
+                    f,
+                    "when converting {current_node}, found extraneous tokens: {extraneous}"
+                )
             }
         }
     }
@@ -54,6 +92,7 @@ where
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
             ConversionError::NoMatch => None,
+            ConversionError::NoMatchWithInfo { .. } => None,
             ConversionError::Extraneous { .. } => None,
             ConversionError::Malformed(ref fatalerror) => Some(fatalerror),
         }
@@ -102,7 +141,7 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
     type FatalError = T::FatalError;
     fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<T::FatalError>> {
         match T::from_pest(pest) {
-            Err(ConversionError::NoMatch) => Ok(None),
+            Err(ConversionError::NoMatch) | Err(ConversionError::NoMatchWithInfo { .. }) => Ok(None),
             result => result.map(Some),
         }
     }
@@ -117,7 +156,9 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
         loop {
             match T::from_pest(pest) {
                 Ok(t) => acc.push(t),
-                Err(ConversionError::NoMatch) => break,
+                Err(ConversionError::NoMatch) | Err(ConversionError::NoMatchWithInfo { .. }) => {
+                    break
+                }
                 Err(error) => return Err(error),
             }
         }
