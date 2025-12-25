@@ -315,8 +315,7 @@ impl<'pest> FromPest<'pest> for TermTail<'pest> {
         // First try to get an operator - if not present, no match
         let op = MulOp::from_pest(pest)?;
         // Then get the factor - if operator succeeded, factor must succeed
-        let factor = Factor::from_pest(pest)
-            .map_err(|_| from_pest::ConversionError::NoMatch)?;
+        let factor = Factor::from_pest(pest).map_err(|_| from_pest::ConversionError::NoMatch)?;
         Ok(TermTail { op, factor })
     }
 }
@@ -359,8 +358,7 @@ impl<'pest> FromPest<'pest> for ArithTail<'pest> {
         pest: &mut pest::iterators::Pairs<'pest, Rule>,
     ) -> Result<Self, from_pest::ConversionError<from_pest::Void>> {
         let op = AddOp::from_pest(pest)?;
-        let term = Term::from_pest(pest)
-            .map_err(|_| from_pest::ConversionError::NoMatch)?;
+        let term = Term::from_pest(pest).map_err(|_| from_pest::ConversionError::NoMatch)?;
         Ok(ArithTail { op, term })
     }
 }
@@ -401,8 +399,7 @@ impl<'pest> FromPest<'pest> for CompTail<'pest> {
         pest: &mut pest::iterators::Pairs<'pest, Rule>,
     ) -> Result<Self, from_pest::ConversionError<from_pest::Void>> {
         let op = CompOp::from_pest(pest)?;
-        let expr = ArithExpr::from_pest(pest)
-            .map_err(|_| from_pest::ConversionError::NoMatch)?;
+        let expr = ArithExpr::from_pest(pest).map_err(|_| from_pest::ConversionError::NoMatch)?;
         Ok(CompTail { op, expr })
     }
 }
@@ -489,7 +486,10 @@ mod tests {
         if let Atom::Number(n) = &expr.comparison.first.first.first.atom {
             assert_eq!(n.value, 42);
         } else {
-            panic!("Expected Number, got {:?}", expr.comparison.first.first.first.atom);
+            panic!(
+                "Expected Number, got {:?}",
+                expr.comparison.first.first.first.atom
+            );
         }
     }
 
