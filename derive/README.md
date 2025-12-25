@@ -369,3 +369,145 @@ The `default` attribute generates code that:
 3. If parsing fails with other errors, propagates the error
 
 This provides a clean, type-safe way to handle optional grammar elements while keeping your AST representation simple and avoiding the complexity of `Option<T>` handling.
+
+## Advanced Patterns: Enums, Nested Choices, and Repetitions
+
+For more complex grammars involving operators and expression parsing, pest-ast provides patterns for handling:
+
+1. **Parsing into enums** - representing grammar alternatives
+2. **Nested choices** - patterns like `(plus | minus)`
+3. **Repetitions of anonymous sequences** - patterns like `(operator ~ operand)*`
+
+### Parsing into Enums
+
+When your grammar has alternatives (using `|`), you can use enums to represent them.
+
+**Example Grammar:**
+```pest
+abc = { a | b | c }
+a = { "a" }
+b = { "b" }
+c = { "c" }
+```
+
+**Rust AST:**
+```rust
+#[derive(FromPest)]
+#[pest_ast(rule(Rule::a))]
+struct A;
+
+#[derive(FromPest)]
+#[pest_ast(rule(Rule::b))]
+struct B;
+
+#[derive(FromPest)]
+#[pest_ast(rule(Rule::c))]
+struct C;
+
+// Enum uses the parent rule that contains the choice
+#[derive(FromPest)]
+#[pest_ast(rule(Rule::abc))]
+enum Abc {
+    A(A),
+    B(B),
+    C(C),
+}
+```
+
+See `derive/examples/simple_enum_derives.rs` for a complete example.
+
+### Nested Choices with Manual FromPest
+
+For patterns like `arith_expr = { term ~ ((plus | minus) ~ term)* }`, the `(plus | minus)` choice
+doesn't have its own grammar rule. You can handle this by implementing `FromPest` manually:
+
+**Example Grammar:**
+```pest
+plus = { "+" }
+minus = { "-" }
+arith_expr = { term ~ ((plus | minus) ~ term)* }
+```
+
+**Rust AST:**
+```rust
+#[derive(FromPest)]
+#[pest_ast(rule(Rule::plus))]
+pub struct Plus;
+
+#[derive(FromPest)]
+#[pest_ast(rule(Rule::minus))]
+pub struct Minus;
+
+// Manual implementation tries each alternative
+#[derive(Debug, Clone, PartialEq)]
+pub enum AddOp {
+    Plus(Plus),
+    Minus(Minus),
+}
+
+impl<'pest> FromPest<'pest> for AddOp {
+    type Rule = Rule;
+    type FatalError = from_pest::Void;
+
+    fn from_pest(
+        pest: &mut pest::iterators::Pairs<'pest, Rule>,
+    ) -> Result<Self, from_pest::ConversionError<from_pest::Void>> {
+        // Try Plus first
+        if let Ok(plus) = Plus::from_pest(pest) {
+            return Ok(AddOp::Plus(plus));
+        }
+        // Try Minus
+        if let Ok(minus) = Minus::from_pest(pest) {
+            return Ok(AddOp::Minus(minus));
+        }
+        Err(from_pest::ConversionError::NoMatch)
+    }
+}
+```
+
+### Repetitions of Anonymous Sequences
+
+For grammar patterns like `term ~ ((operator ~ operand)*)`, the repeated `(operator ~ operand)` pairs
+don't have their own grammar rule. Create a "tail" struct with manual `FromPest` implementation:
+
+**Example Grammar:**
+```pest
+term = { factor ~ ((mul | div) ~ factor)* }
+```
+
+**Rust AST:**
+```rust
+// One (operator, operand) pair from the repetition
+#[derive(Debug)]
+pub struct TermTail<'pest> {
+    pub op: MulOp,
+    pub factor: Factor<'pest>,
+}
+
+impl<'pest> FromPest<'pest> for TermTail<'pest> {
+    type Rule = Rule;
+    type FatalError = from_pest::Void;
+
+    fn from_pest(
+        pest: &mut pest::iterators::Pairs<'pest, Rule>,
+    ) -> Result<Self, from_pest::ConversionError<from_pest::Void>> {
+        // First try to get an operator - if not present, no match
+        let op = MulOp::from_pest(pest)?;
+        // Then get the operand
+        let factor = Factor::from_pest(pest)
+            .map_err(|_| from_pest::ConversionError::NoMatch)?;
+        Ok(TermTail { op, factor })
+    }
+}
+
+// The main structure uses Vec<TermTail> for the repetition
+#[derive(FromPest, Debug)]
+#[pest_ast(rule(Rule::term))]
+pub struct Term<'pest> {
+    pub first: Factor<'pest>,
+    pub rest: Vec<TermTail<'pest>>,  // Handles the (op ~ operand)* part
+}
+```
+
+For a complete working example demonstrating all these patterns with an expression parser,
+see `derive/examples/expression_parser.rs` and `derive/examples/expression_parser.pest`.
