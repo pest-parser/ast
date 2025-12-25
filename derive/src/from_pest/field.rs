@@ -98,8 +98,7 @@ impl ConversionStrategy {
                     // Try to parse using FromPest first
                     match ::from_pest::FromPest::from_pest(inner) {
                         Ok(value) => value,
-                        Err(::from_pest::ConversionError::NoMatch) |
-                        Err(::from_pest::ConversionError::NoMatchWithInfo { .. }) => #default_expr,
+                        Err(ref e) if e.is_no_match() => #default_expr,
                         Err(e) => return Err(e),
                     }
                 }}

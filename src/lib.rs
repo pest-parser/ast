@@ -141,7 +141,7 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
     type FatalError = T::FatalError;
     fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<T::FatalError>> {
         match T::from_pest(pest) {
-            Err(ConversionError::NoMatch) | Err(ConversionError::NoMatchWithInfo { .. }) => Ok(None),
+            Err(ref e) if e.is_no_match() => Ok(None),
             result => result.map(Some),
         }
     }
@@ -156,9 +156,7 @@ impl<'pest, Rule: RuleType, T: FromPest<'pest, Rule = Rule>> FromPest<'pest> for
         loop {
             match T::from_pest(pest) {
                 Ok(t) => acc.push(t),
-                Err(ConversionError::NoMatch) | Err(ConversionError::NoMatchWithInfo { .. }) => {
-                    break
-                }
+                Err(ref e) if e.is_no_match() => break,
                 Err(error) => return Err(error),
             }
         }
