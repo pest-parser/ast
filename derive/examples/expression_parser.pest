@@ -1,0 +1,49 @@
+// Grammar demonstrating patterns for:
+// 1. Repetition of anonymous sequences: comparison = { arith_expr ~ (comp_op ~ arith_expr)* }
+// 2. Nested choices in repetitions: arith_expr = { term ~ ((plus|minus) ~ term)* }
+// 3. Parsing into enums for operators
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+// Literals - using @ (atomic) to prevent WHITESPACE from being included in spans
+number = @{ ASCII_DIGIT+ }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// Atomic expressions
+atom = { number | identifier | "(" ~ expr ~ ")" }
+
+// Multiplicative operators (for nested choice example)
+mul = { "*" }
+div = { "/" }
+
+// Additive operators (for nested choice example)
+plus = { "+" }
+minus = { "-" }
+
+// Comparison operators (for nested choice example)
+eq = { "==" }
+neq = { "!=" }
+lt = { "<" }
+gt = { ">" }
+
+// Expressions with operator precedence
+// Each level demonstrates the pattern: term ~ (operator ~ term)*
+
+// Factor: atom
+factor = { atom }
+
+// Term: factor ~ ((mul | div) ~ factor)*
+// This demonstrates nested choice (mul | div) in a repetition
+term = { factor ~ ((mul | div) ~ factor)* }
+
+// Arithmetic expression: term ~ ((plus | minus) ~ term)*
+// This demonstrates nested choice (plus | minus) in a repetition
+arith_expr = { term ~ ((plus | minus) ~ term)* }
+
+// Comparison: arith_expr ~ (comp_op ~ arith_expr)*
+// This demonstrates using a combined operator rule for cleaner AST
+comp_op = { eq | neq | lt | gt }
+comparison = { arith_expr ~ (comp_op ~ arith_expr)* }
+
+// Top-level expression
+expr = { comparison }
