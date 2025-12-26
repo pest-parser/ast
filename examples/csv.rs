@@ -19,7 +19,7 @@ mod ast {
     use super::csv::Rule;
     use pest::Span;
 
-    fn span_into_str(span: Span) -> &str {
+    fn span_into_str(span: Span<'_>) -> &str {
         span.as_str()
     }
 

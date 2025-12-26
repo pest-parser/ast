@@ -93,12 +93,12 @@ impl ConversionStrategy {
             }
             ConversionStrategy::Default(span, default_expr) => {
                 // For default strategy, we try to parse as normal FromPest,
-                // but if it fails (NoMatch), we use the default value
+                // but if it fails (NoMatch or NoMatchWithInfo), we use the default value
                 quote_spanned! {span=> {
                     // Try to parse using FromPest first
                     match ::from_pest::FromPest::from_pest(inner) {
                         Ok(value) => value,
-                        Err(::from_pest::ConversionError::NoMatch) => #default_expr,
+                        Err(ref e) if e.is_no_match() => #default_expr,
                         Err(e) => return Err(e),
                     }
                 }}
