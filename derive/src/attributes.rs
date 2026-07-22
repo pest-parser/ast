@@ -320,10 +320,10 @@ impl Parse for RuleAttribute {
         let rule = input.parse()?;
         let paren = parenthesized!(content in input);
         let mut path: Path = content.parse()?;
-        let (variant, _) = path.segments.pop().unwrap().into_tuple();
+        let (variant, _) = path.segments.pop_pair().unwrap().into_tuple();
         let sep = if path.segments.trailing_punct() {
             // fix trailing punct
-            let (head, sep) = path.segments.pop().unwrap().into_tuple();
+            let (head, sep) = path.segments.pop_pair().unwrap().into_tuple();
             path.segments.push(head);
             sep.unwrap()
         } else {
